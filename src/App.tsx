@@ -1,13 +1,27 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import Home from './pages/Home'
+﻿import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import Layout from './components/Layout'
+import { ToastProvider } from './contexts/ToastContext'
+import Capture from './pages/Capture'
+import Notes from './pages/Notes'
+import Places from './pages/Places'
+import Tasks from './pages/Tasks'
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <ToastProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            {/* Capture is the default route because voice-first capture is the main entry point. */}
+            <Route path="/" element={<Navigate to="/capture" replace />} />
+            <Route path="/tasks" element={<Tasks />} />
+            <Route path="/notes" element={<Notes />} />
+            <Route path="/capture" element={<Capture />} />
+            <Route path="/places" element={<Places />} />
+            <Route path="*" element={<Navigate to="/capture" replace />} />
+          </Route>
+        </Routes>
+      </ToastProvider>
     </BrowserRouter>
   )
 }

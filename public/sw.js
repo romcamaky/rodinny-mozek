@@ -1,5 +1,5 @@
 const STATIC_CACHE = 'rodinny-mozek-static-v1'
-const APP_SHELL_FILES = ['/', '/index.html', '/manifest.json']
+const APP_SHELL_FILES = ['/', '/index.html']
 
 // During install, cache the core app shell so first paint works offline.
 self.addEventListener('install', (event) => {
@@ -25,28 +25,23 @@ self.addEventListener('activate', (event) => {
   )
 })
 
-// Intercept requests and choose strategy by request type.
+// Intercept fetch requests and choose caching strategy.
 self.addEventListener('fetch', (event) => {
   const request = event.request
 
-  // Use network-first for API requests so data stays fresh, with cache fallback offline.
-  if (request.url.includes('/rest/v1/') || request.url.includes('/auth/v1/')) {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          const clonedResponse = response.clone()
-          caches.open(STATIC_CACHE).then((cache) => cache.put(request, clonedResponse))
-          return response
-        })
-        .catch(async () => {
-          const cachedResponse = await caches.match(request)
-          return cachedResponse || new Response('Offline', { status: 503 })
-        }),
-    )
+  // NEVER intercept Supabase API calls — let them go straight to the network.
+  // This includes REST API (/rest/v1/), Auth (/auth/v1/), Edge Functions (/functions/v1/),
+  // and realtime WebSocket connections.
+  if (request.url.includes('supabase.co')) {
+    return // Don't call event.respondWith — browser handles normally
+  }
+
+  // NEVER cache non-GET requests (POST, PUT, DELETE, etc.)
+  if (request.method !== 'GET') {
     return
   }
 
-  // Use cache-first for static assets, then network as fallback.
+  // Cache-first for static assets (scripts, styles, images, fonts)
   if (
     request.destination === 'script' ||
     request.destination === 'style' ||
@@ -54,14 +49,10 @@ self.addEventListener('fetch', (event) => {
     request.destination === 'font'
   ) {
     event.respondWith(
-      caches.match(request).then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse
-        }
-
-        return fetch(request).then((response) => {
-          const clonedResponse = response.clone()
-          caches.open(STATIC_CACHE).then((cache) => cache.put(request, clonedResponse))
+      caches.match(request).then((cached) => {
+        return cached || fetch(request).then((response) => {
+          const clone = response.clone()
+          caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone))
           return response
         })
       }),
@@ -69,11 +60,11 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // For navigation/document requests, prefer network and fall back to cached shell.
-  event.respondWith(
-    fetch(request).catch(async () => {
-      const cachedResponse = await caches.match('/index.html')
-      return cachedResponse || caches.match('/')
-    }),
-  )
+  // Network-first for navigation (HTML pages) with offline fallback
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request).catch(() => caches.match('/index.html')),
+    )
+    return
+  }
 })
