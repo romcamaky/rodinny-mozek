@@ -47,16 +47,16 @@ function Home() {
       : 'bg-rose-500'
 
   const statusText = isChecking
-    ? 'Kontroluji pripojeni...'
+    ? 'Kontroluji připojení...'
     : isConnected
-      ? 'Supabase pripojeno'
+      ? 'Supabase připojeno'
       : 'Supabase odpojeno'
 
   return (
     <main className="flex min-h-screen items-center justify-center px-6 py-10">
       <section className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-lg">
-        <h1 className="text-4xl font-bold text-slate-800">Rodinny Mozek ??</h1>
-        <p className="mt-3 text-base text-slate-500">Rodinny AI asistent</p>
+        <h1 className="text-4xl font-bold text-slate-800">Rodinný Mozek 🧠</h1>
+        <p className="mt-3 text-base text-slate-500">Rodinný AI asistent</p>
 
         <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-slate-100 px-4 py-2 text-sm text-slate-700">
           <span className={`h-2.5 w-2.5 rounded-full ${indicatorClass}`} />
