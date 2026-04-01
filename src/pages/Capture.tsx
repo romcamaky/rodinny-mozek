@@ -2,7 +2,12 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '../contexts/ToastContext'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
-import { saveClassifiedData, type VoiceClassification } from '../lib/dataService'
+import PlaceForm from '../components/PlaceForm'
+import {
+  saveClassifiedData,
+  type SavePlaceInput,
+  type VoiceClassification,
+} from '../lib/dataService'
 import {
   sendToVoiceRouter,
   type NoteData,
@@ -17,19 +22,6 @@ type Target = 'task' | 'note' | 'place' | 'milestone'
 
 type TaskFormState = TaskData & { visibility: Visibility }
 type NoteFormState = NoteData & { visibility: Visibility }
-type PlaceFormState = PlaceData
-
-const PLACE_TAG_OPTIONS = [
-  'Děti',
-  'Venku',
-  'Uvnitř',
-  'Farma',
-  'Hřiště',
-  'Muzeum',
-  'Příroda',
-  'Restaurace',
-]
-
 const NOTE_CATEGORY_OPTIONS: { label: string; value: NoteData['category'] }[] = [
   { label: 'Nápad', value: 'idea' },
   { label: 'Výlet', value: 'trip' },
@@ -37,13 +29,6 @@ const NOTE_CATEGORY_OPTIONS: { label: string; value: NoteData['category'] }[] = 
   { label: 'Osobní', value: 'personal' },
   { label: 'Projekt', value: 'project' },
   { label: 'Ostatní', value: 'other' },
-]
-
-const PLACE_SOURCE_OPTIONS: { label: string; value: PlaceData['source'] }[] = [
-  { label: 'Instagram', value: 'instagram' },
-  { label: 'Kamarád', value: 'friend' },
-  { label: 'Web', value: 'web' },
-  { label: 'Vlastní zkušenost', value: 'own_experience' },
 ]
 
 function formatDuration(seconds: number): string {
@@ -68,7 +53,7 @@ function Capture() {
   const [result, setResult] = useState<VoiceRouterResponse | null>(null)
   const [taskForm, setTaskForm] = useState<TaskFormState | null>(null)
   const [noteForm, setNoteForm] = useState<NoteFormState | null>(null)
-  const [placeForm, setPlaceForm] = useState<PlaceFormState | null>(null)
+  const [placeForm, setPlaceForm] = useState<SavePlaceInput | null>(null)
   const [screenError, setScreenError] = useState<string | null>(null)
   const [lastCaptureSource, setLastCaptureSource] = useState<'voice' | 'text'>('text')
   const [isSaving, setIsSaving] = useState(false)
@@ -173,6 +158,8 @@ function Capture() {
           tags: data.tags ?? [],
           notes: data.notes ?? '',
           source: data.source ?? 'web',
+          website: null,
+          visit_duration_minutes: null,
         })
         setTaskForm(null)
         setNoteForm(null)
@@ -272,17 +259,6 @@ function Capture() {
       }
     }
 
-    if (target === 'place') {
-      if (!placeForm) {
-        return null
-      }
-      return {
-        target: 'place',
-        confidence: result.classification.confidence,
-        data: placeForm,
-      }
-    }
-
     if (target === 'milestone') {
       return result.classification as VoiceClassification
     }
@@ -290,9 +266,43 @@ function Capture() {
     return null
   }
 
-  // Persists the confirmed item to Supabase (or milestone stub) using current form values.
+  // Saves a place from the shared PlaceForm (form owns edited fields until submit).
+  async function handlePlaceSave(data: SavePlaceInput) {
+    if (!result || isSaving) {
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const outcome = await saveClassifiedData(
+        {
+          target: 'place',
+          confidence: result.classification.confidence,
+          data,
+        },
+        lastCaptureSource,
+        'shared',
+      )
+
+      if (!outcome.success) {
+        showToast(outcome.error ?? 'Uložení se nezdařilo.', 'error')
+        return
+      }
+
+      showToast('Uloženo! (Místo)', 'success')
+      resetToInput()
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Persists task / note / milestone using current form state (place uses PlaceForm submit).
   async function handleSave() {
     if (!result || isSaving) {
+      return
+    }
+
+    if (result.classification.target === 'place') {
       return
     }
 
@@ -352,19 +362,6 @@ function Capture() {
         visibility: noteForm.visibility === 'shared' ? 'private' : 'shared',
       })
     }
-  }
-
-  function togglePlaceTag(tag: string) {
-    if (!placeForm) {
-      return
-    }
-
-    const hasTag = placeForm.tags.includes(tag.toLowerCase())
-    const nextTags = hasTag
-      ? placeForm.tags.filter((item) => item !== tag.toLowerCase())
-      : [...placeForm.tags, tag.toLowerCase()]
-
-    setPlaceForm({ ...placeForm, tags: nextTags })
   }
 
   function renderVisibilityToggle(target: 'task' | 'note', visibility: Visibility) {
@@ -491,78 +488,6 @@ function Capture() {
     )
   }
 
-  function renderPlaceForm() {
-    if (!placeForm) {
-      return null
-    }
-
-    return (
-      <div className="mt-4 space-y-3">
-        <label className="block text-sm font-medium">Název</label>
-        <input
-          className="min-h-11 w-full rounded-xl border px-3 py-2 text-base"
-          style={{ borderColor: '#cbd5e1' }}
-          value={placeForm.name}
-          onChange={(event) => setPlaceForm({ ...placeForm, name: event.target.value })}
-        />
-
-        <label className="block text-sm font-medium">Adresa</label>
-        <input
-          className="min-h-11 w-full rounded-xl border px-3 py-2 text-base"
-          style={{ borderColor: '#cbd5e1' }}
-          value={placeForm.address ?? ''}
-          onChange={(event) => setPlaceForm({ ...placeForm, address: event.target.value })}
-        />
-
-        <label className="block text-sm font-medium">Štítky</label>
-        <div className="flex flex-wrap gap-2">
-          {PLACE_TAG_OPTIONS.map((tag) => {
-            const active = placeForm.tags.includes(tag.toLowerCase())
-            return (
-              <button
-                key={tag}
-                type="button"
-                className="min-h-11 rounded-full border px-3 py-2 text-sm"
-                style={{
-                  borderColor: active ? 'var(--color-primary)' : '#cbd5e1',
-                  backgroundColor: active ? 'color-mix(in srgb, var(--color-primary) 16%, white)' : 'white',
-                }}
-                onClick={() => togglePlaceTag(tag)}
-              >
-                {tag}
-              </button>
-            )
-          })}
-        </div>
-
-        <label className="block text-sm font-medium">Poznámky</label>
-        <textarea
-          className="w-full rounded-xl border px-3 py-2 text-base"
-          style={{ borderColor: '#cbd5e1' }}
-          rows={3}
-          value={placeForm.notes ?? ''}
-          onChange={(event) => setPlaceForm({ ...placeForm, notes: event.target.value })}
-        />
-
-        <label className="block text-sm font-medium">Zdroj</label>
-        <select
-          className="min-h-11 w-full rounded-xl border px-3 py-2 text-base"
-          style={{ borderColor: '#cbd5e1' }}
-          value={placeForm.source}
-          onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-            setPlaceForm({ ...placeForm, source: event.target.value as PlaceData['source'] })
-          }
-        >
-          {PLACE_SOURCE_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      </div>
-    )
-  }
-
   function renderInputState() {
     return (
       <section className="mx-auto flex w-full max-w-md flex-col items-center">
@@ -670,38 +595,47 @@ function Capture() {
 
           {result.classification.target === 'task' ? renderTaskForm() : null}
           {result.classification.target === 'note' ? renderNoteForm() : null}
-          {result.classification.target === 'place' ? renderPlaceForm() : null}
+          {result.classification.target === 'place' && placeForm ? (
+            <PlaceForm
+              initialData={placeForm}
+              isSaving={isSaving}
+              onSave={(data) => void handlePlaceSave(data)}
+              onCancel={resetToInput}
+            />
+          ) : null}
         </div>
 
-        <div
-          className="fixed inset-x-4 z-40"
-          style={{ bottom: 'calc(92px + env(safe-area-inset-bottom))' }}
-        >
-          <button
-            type="button"
-            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-base font-semibold text-white shadow-lg disabled:opacity-70"
-            style={{ backgroundColor: 'var(--color-primary)' }}
-            disabled={isSaving}
-            onClick={() => void handleSave()}
+        {result.classification.target !== 'place' ? (
+          <div
+            className="fixed inset-x-4 z-40"
+            style={{ bottom: 'calc(92px + env(safe-area-inset-bottom))' }}
           >
-            {isSaving ? (
-              <>
-                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Ukládám...
-              </>
-            ) : (
-              'Uložit'
-            )}
-          </button>
-          <button
-            type="button"
-            className="mt-2 min-h-11 w-full text-sm"
-            style={{ color: 'var(--color-text-secondary)' }}
-            onClick={resetToInput}
-          >
-            Zahodit
-          </button>
-        </div>
+            <button
+              type="button"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-base font-semibold text-white shadow-lg disabled:opacity-70"
+              style={{ backgroundColor: 'var(--color-primary)' }}
+              disabled={isSaving}
+              onClick={() => void handleSave()}
+            >
+              {isSaving ? (
+                <>
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  Ukládám...
+                </>
+              ) : (
+                'Uložit'
+              )}
+            </button>
+            <button
+              type="button"
+              className="mt-2 min-h-11 w-full text-sm"
+              style={{ color: 'var(--color-text-secondary)' }}
+              onClick={resetToInput}
+            >
+              Zahodit
+            </button>
+          </div>
+        ) : null}
       </section>
     )
   }

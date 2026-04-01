@@ -5,8 +5,6 @@ type TabItem = {
   label: string
   path: string
   icon: ReactNode
-  disabled?: boolean
-  soonLabel?: string
   isPrimary?: boolean
 }
 
@@ -67,13 +65,7 @@ function BottomNav({ navHeight }: BottomNavProps) {
     { label: 'Úkoly', path: '/tasks', icon: <TasksIcon /> },
     { label: 'Poznámky', path: '/notes', icon: <NotesIcon /> },
     { label: 'Zachytit', path: '/capture', icon: <MicIcon />, isPrimary: true },
-    {
-      label: 'Místa',
-      path: '/places',
-      icon: <PlacesIcon />,
-      disabled: true,
-      soonLabel: 'Brzy',
-    },
+    { label: 'Místa', path: '/places', icon: <PlacesIcon /> },
   ]
 
   return (
@@ -92,9 +84,7 @@ function BottomNav({ navHeight }: BottomNavProps) {
           const isPrimary = Boolean(tab.isPrimary)
           const baseColor = isActive
             ? 'var(--color-primary)'
-            : tab.disabled
-              ? 'color-mix(in srgb, var(--color-text-secondary) 65%, white)'
-              : 'var(--color-text-secondary)'
+            : 'var(--color-text-secondary)'
 
           return (
             <button
@@ -102,13 +92,8 @@ function BottomNav({ navHeight }: BottomNavProps) {
               type="button"
               className="flex min-h-11 min-w-11 flex-col items-center justify-center gap-1 rounded-xl"
               style={{ color: baseColor }}
-              onClick={() => {
-                if (!tab.disabled) {
-                  navigate(tab.path)
-                }
-              }}
+              onClick={() => navigate(tab.path)}
               aria-current={isActive ? 'page' : undefined}
-              aria-disabled={tab.disabled}
             >
               {isPrimary ? (
                 <span
@@ -126,11 +111,6 @@ function BottomNav({ navHeight }: BottomNavProps) {
                 tab.icon
               )}
               <span className="text-[11px] font-medium leading-none">{tab.label}</span>
-              {tab.soonLabel ? (
-                <span className="text-[10px] leading-none" style={{ color: 'var(--color-text-secondary)' }}>
-                  {tab.soonLabel}
-                </span>
-              ) : null}
             </button>
           )
         })}

@@ -3,7 +3,7 @@
 // Each function inserts into the correct Supabase table based on data type.
 
 import { supabase } from './supabase'
-import type { Note, Task } from '../types/database'
+import type { Note, Place, Task } from '../types/database'
 import type { NoteData, PlaceData, TaskData } from './voiceRouter'
 
 // Temporary hardcoded user ID — replaced with real auth in Phase 3
@@ -122,6 +122,63 @@ export async function deleteNote(
   return { success: true }
 }
 
+export type PlaceSourceFilter = Place['source'] | 'all'
+
+/**
+ * Extended place payload for forms (DB + optional website and visit duration).
+ */
+export type SavePlaceInput = PlaceData & {
+  website?: string | null
+  visit_duration_minutes?: number | null
+}
+
+/**
+ * Load places for the temp user. Tag filter uses array overlap (ANY selected tag matches).
+ */
+export async function fetchPlaces(filters?: {
+  tags?: string[]
+  source?: PlaceSourceFilter
+}): Promise<Place[]> {
+  let query = supabase
+    .from('places')
+    .select('*')
+    .eq('user_id', TEMP_USER_ID)
+    .order('created_at', { ascending: false })
+
+  const source = filters?.source ?? 'all'
+  if (source !== 'all') {
+    query = query.eq('source', source)
+  }
+
+  const tagList = filters?.tags?.filter((t) => t.length > 0) ?? []
+  if (tagList.length > 0) {
+    query = query.overlaps('tags', tagList)
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as Place[]
+}
+
+export async function deletePlace(
+  placeId: string,
+): Promise<{ success: boolean; error?: string }> {
+  const { error } = await supabase
+    .from('places')
+    .delete()
+    .eq('id', placeId)
+    .eq('user_id', TEMP_USER_ID)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
 /** Payload shape returned by Claude for milestones (no DB table yet). */
 export interface MilestoneData {
   title: string
@@ -201,14 +258,22 @@ export async function saveNote(
   return inserted
 }
 
-// Maps PlaceData to the `places` row shape; optional geo/URL fields left null for later enrichment.
-export async function savePlace(data: PlaceData) {
+// Maps place form data to the `places` row; geo/source_url left null unless provided later.
+export async function savePlace(data: SavePlaceInput) {
   const address =
     data.address !== undefined && data.address.trim() !== ''
       ? data.address.trim()
       : null
   const notes =
     data.notes !== undefined && data.notes.trim() !== '' ? data.notes.trim() : null
+  const websiteRaw = data.website?.trim()
+  const website = websiteRaw && websiteRaw.length > 0 ? websiteRaw : null
+  const duration =
+    typeof data.visit_duration_minutes === 'number' &&
+    !Number.isNaN(data.visit_duration_minutes) &&
+    data.visit_duration_minutes > 0
+      ? Math.round(data.visit_duration_minutes)
+      : null
 
   const row = {
     user_id: TEMP_USER_ID,
@@ -216,8 +281,8 @@ export async function savePlace(data: PlaceData) {
     address,
     latitude: null as number | null,
     longitude: null as number | null,
-    website: null as string | null,
-    visit_duration_minutes: null as number | null,
+    website,
+    visit_duration_minutes: duration,
     tags: data.tags,
     source: data.source,
     source_url: null as string | null,
@@ -260,7 +325,7 @@ export async function saveClassifiedData(
         await saveNote(classification.data as NoteData, source, visibility)
         return { success: true, target: classification.target }
       case 'place':
-        await savePlace(classification.data as PlaceData)
+        await savePlace(classification.data as SavePlaceInput)
         return { success: true, target: classification.target }
       case 'milestone':
         await saveMilestone(classification.data as MilestoneData)
