@@ -1,5 +1,6 @@
-﻿import { Outlet } from 'react-router-dom'
+import { Outlet } from 'react-router-dom'
 import BottomNav from './BottomNav'
+import CaptureFAB from './CaptureFAB'
 
 const TOP_BAR_HEIGHT = 56
 const BOTTOM_NAV_HEIGHT = 80
@@ -40,6 +41,9 @@ function Layout() {
 
       {/* Fixed navigation zone anchored to bottom; safe area prevents clipping in iOS PWAs. */}
       <BottomNav navHeight={BOTTOM_NAV_HEIGHT} />
+
+      {/* Floating capture entry point available on every screen. */}
+      <CaptureFAB />
     </div>
   )
 }

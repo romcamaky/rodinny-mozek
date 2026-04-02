@@ -2,12 +2,8 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '../contexts/ToastContext'
 import { useAudioRecorder } from '../hooks/useAudioRecorder'
-import PlaceForm from '../components/PlaceForm'
-import {
-  saveClassifiedData,
-  type SavePlaceInput,
-  type VoiceClassification,
-} from '../lib/dataService'
+import PlaceForm from './PlaceForm'
+import { saveClassifiedData, type SavePlaceInput, type VoiceClassification } from '../lib/dataService'
 import {
   sendToVoiceRouter,
   type NoteData,
@@ -16,12 +12,13 @@ import {
   type VoiceRouterResponse,
 } from '../lib/voiceRouter'
 
-type CaptureState = 'input' | 'recording' | 'loading' | 'confirm'
+type CaptureOverlayState = 'input' | 'recording' | 'loading' | 'confirm'
 type Visibility = 'shared' | 'private'
 type Target = 'task' | 'note' | 'place' | 'milestone'
 
 type TaskFormState = TaskData & { visibility: Visibility }
 type NoteFormState = NoteData & { visibility: Visibility }
+
 const NOTE_CATEGORY_OPTIONS: { label: string; value: NoteData['category'] }[] = [
   { label: 'Nápad', value: 'idea' },
   { label: 'Výlet', value: 'trip' },
@@ -37,7 +34,11 @@ function formatDuration(seconds: number): string {
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`
 }
 
-function Capture() {
+type CaptureOverlayProps = {
+  onClose: () => void
+}
+
+function CaptureOverlay({ onClose }: CaptureOverlayProps) {
   const { showToast } = useToast()
   const {
     isRecording,
@@ -48,7 +49,7 @@ function Capture() {
     recordingDuration,
   } = useAudioRecorder()
 
-  const [captureState, setCaptureState] = useState<CaptureState>('input')
+  const [captureState, setCaptureState] = useState<CaptureOverlayState>('input')
   const [textInput, setTextInput] = useState('')
   const [result, setResult] = useState<VoiceRouterResponse | null>(null)
   const [taskForm, setTaskForm] = useState<TaskFormState | null>(null)
@@ -59,6 +60,26 @@ function Capture() {
   const [isSaving, setIsSaving] = useState(false)
 
   const textAreaRef = useRef<HTMLTextAreaElement | null>(null)
+  const closeTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        window.clearTimeout(closeTimerRef.current)
+        closeTimerRef.current = null
+      }
+    }
+  }, [])
+
+  function scheduleCloseAfterSuccess() {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current)
+    }
+    closeTimerRef.current = window.setTimeout(() => {
+      closeTimerRef.current = null
+      onClose()
+    }, 1500)
+  }
 
   useEffect(() => {
     if (audioError) {
@@ -71,16 +92,13 @@ function Capture() {
     if (!audioBlob || captureState !== 'recording') {
       return
     }
-
     void submitRequest({ audioBlob })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioBlob, captureState])
 
   useEffect(() => {
     const textarea = textAreaRef.current
-    if (!textarea) {
-      return
-    }
+    if (!textarea) return
 
     textarea.style.height = 'auto'
     const maxHeight = 24 * 4 + 24
@@ -89,33 +107,21 @@ function Capture() {
 
   const targetLabel = useMemo(() => {
     const target = result?.classification.target
-    if (target === 'task') {
-      return 'Úkol'
-    }
-    if (target === 'note') {
-      return 'Poznámka'
-    }
-    if (target === 'place') {
-      return 'Místo'
-    }
+    if (target === 'task') return 'Úkol'
+    if (target === 'note') return 'Poznámka'
+    if (target === 'place') return 'Místo'
     return 'Milník'
   }, [result])
 
   const targetStyle = useMemo(() => {
     const target = result?.classification.target
-    if (target === 'task') {
-      return { backgroundColor: '#dbeafe', color: '#1d4ed8' }
-    }
-    if (target === 'note') {
-      return { backgroundColor: '#dcfce7', color: '#166534' }
-    }
-    if (target === 'place') {
-      return { backgroundColor: '#ffedd5', color: '#c2410c' }
-    }
+    if (target === 'task') return { backgroundColor: '#dbeafe', color: '#1d4ed8' }
+    if (target === 'note') return { backgroundColor: '#dcfce7', color: '#166534' }
+    if (target === 'place') return { backgroundColor: '#ffedd5', color: '#c2410c' }
     return { backgroundColor: '#e2e8f0', color: '#334155' }
   }, [result])
 
-  // This function drives transitions between input/recording/loading/confirm states.
+  // Drives transitions between input/recording/loading/confirm states.
   async function submitRequest(payload: { audioBlob?: Blob; textInput?: string }) {
     setScreenError(null)
     setCaptureState('loading')
@@ -125,7 +131,7 @@ function Capture() {
       const response = await sendToVoiceRouter(payload)
       setResult(response)
 
-      // We pre-fill extracted fields so the user can quickly correct and confirm before saving.
+      // Pre-fill extracted fields so the user can quickly correct and confirm before saving.
       if (response.classification.target === 'task') {
         const data = response.classification.data as TaskData
         setTaskForm({
@@ -174,18 +180,16 @@ function Capture() {
       setCaptureState('confirm')
       setTextInput('')
     } catch (err) {
-      // Network / DNS / CORS failures usually surface as TypeError from fetch.
+      // Network/DNS/CORS failures usually surface as TypeError from fetch.
       const isNetworkError =
-        err instanceof TypeError ||
-        (err instanceof Error && /failed to fetch|network|load failed/i.test(err.message))
+        err instanceof TypeError || (err instanceof Error && /failed to fetch|network|load failed/i.test(err.message))
 
       const screenMessage = isNetworkError
         ? 'Nepodařilo se spojit se serverem. Zkus to znovu.'
         : 'Chyba při zpracování. Zkus to znovu.'
-      const toastMessage = screenMessage
 
       setScreenError(screenMessage)
-      showToast(toastMessage, 'error')
+      showToast(screenMessage, 'error')
       setCaptureState('input')
     }
   }
@@ -206,39 +210,29 @@ function Capture() {
       await startRecording()
       return
     }
-
     stopRecording()
   }
 
   function handleCancelRecording() {
-    if (isRecording) {
-      stopRecording()
-    }
+    if (isRecording) stopRecording()
     resetToInput()
   }
 
   async function handleTextSubmit(event: FormEvent) {
     event.preventDefault()
     const trimmed = textInput.trim()
-    if (!trimmed) {
-      return
-    }
-
+    if (!trimmed) return
     await submitRequest({ textInput: trimmed })
   }
 
   // Builds the classification object from edited form state so Supabase gets the latest user edits.
   function buildClassificationForSave(): VoiceClassification | null {
-    if (!result) {
-      return null
-    }
+    if (!result) return null
 
     const target = result.classification.target
 
     if (target === 'task') {
-      if (!taskForm) {
-        return null
-      }
+      if (!taskForm) return null
       const { visibility: _v, ...taskData } = taskForm
       return {
         target: 'task',
@@ -248,9 +242,7 @@ function Capture() {
     }
 
     if (target === 'note') {
-      if (!noteForm) {
-        return null
-      }
+      if (!noteForm) return null
       const { visibility: _v, ...noteData } = noteForm
       return {
         target: 'note',
@@ -259,18 +251,14 @@ function Capture() {
       }
     }
 
-    if (target === 'milestone') {
-      return result.classification as VoiceClassification
-    }
+    if (target === 'milestone') return result.classification as VoiceClassification
 
     return null
   }
 
   // Saves a place from the shared PlaceForm (form owns edited fields until submit).
   async function handlePlaceSave(data: SavePlaceInput) {
-    if (!result || isSaving) {
-      return
-    }
+    if (!result || isSaving) return
 
     setIsSaving(true)
     try {
@@ -291,20 +279,16 @@ function Capture() {
 
       showToast('Uloženo! (Místo)', 'success')
       resetToInput()
+      scheduleCloseAfterSuccess()
     } finally {
       setIsSaving(false)
     }
   }
 
-  // Persists task / note / milestone using current form state (place uses PlaceForm submit).
+  // Persists task/note/milestone using current form state (place uses PlaceForm submit).
   async function handleSave() {
-    if (!result || isSaving) {
-      return
-    }
-
-    if (result.classification.target === 'place') {
-      return
-    }
+    if (!result || isSaving) return
+    if (result.classification.target === 'place') return
 
     const classification = buildClassificationForSave()
     if (!classification) {
@@ -321,11 +305,7 @@ function Capture() {
 
     setIsSaving(true)
     try {
-      const outcome = await saveClassifiedData(
-        classification,
-        lastCaptureSource,
-        visibility,
-      )
+      const outcome = await saveClassifiedData(classification, lastCaptureSource, visibility)
 
       if (!outcome.success) {
         showToast(outcome.error ?? 'Uložení se nezdařilo.', 'error')
@@ -343,6 +323,7 @@ function Capture() {
 
       showToast(`Uloženo! (${labelCz})`, 'success')
       resetToInput()
+      scheduleCloseAfterSuccess()
     } finally {
       setIsSaving(false)
     }
@@ -387,9 +368,7 @@ function Capture() {
   }
 
   function renderTaskForm() {
-    if (!taskForm) {
-      return null
-    }
+    if (!taskForm) return null
 
     return (
       <div className="mt-4 space-y-3">
@@ -425,11 +404,11 @@ function Capture() {
                 className="min-h-11 rounded-xl border px-3 py-2 text-sm"
                 style={{
                   borderColor: active ? 'var(--color-primary)' : '#cbd5e1',
-                  backgroundColor: active ? 'color-mix(in srgb, var(--color-primary) 16%, white)' : 'white',
+                  backgroundColor: active
+                    ? 'color-mix(in srgb, var(--color-primary) 16%, white)'
+                    : 'white',
                 }}
-                onClick={() =>
-                  setTaskForm({ ...taskForm, assigned_to: option.value as TaskData['assigned_to'] })
-                }
+                onClick={() => setTaskForm({ ...taskForm, assigned_to: option.value as TaskData['assigned_to'] })}
               >
                 {option.label}
               </button>
@@ -452,9 +431,7 @@ function Capture() {
   }
 
   function renderNoteForm() {
-    if (!noteForm) {
-      return null
-    }
+    if (!noteForm) return null
 
     return (
       <div className="mt-4 space-y-3">
@@ -571,9 +548,7 @@ function Capture() {
   }
 
   function renderConfirmState() {
-    if (!result) {
-      return null
-    }
+    if (!result) return null
 
     return (
       <section className="mx-auto w-full max-w-md pb-28">
@@ -641,21 +616,34 @@ function Capture() {
   }
 
   return (
-    <section>
-      {screenError ? (
-        <p
-          className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm"
-          style={{ color: '#b91c1c' }}
-        >
-          {screenError}
-        </p>
-      ) : null}
+    <div className="fixed inset-0 z-[60] bg-white overflow-y-auto" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        className="fixed right-4 top-4 z-[61] min-h-11 min-w-11 rounded-full border bg-white text-xl shadow-sm"
+        style={{ color: 'var(--color-text-secondary)', borderColor: '#e2e8f0' }}
+        aria-label="Zavřít"
+        onClick={onClose}
+      >
+        ✕
+      </button>
 
-      {captureState === 'loading' ? renderLoadingState() : null}
-      {captureState === 'input' || captureState === 'recording' ? renderInputState() : null}
-      {captureState === 'confirm' ? renderConfirmState() : null}
-    </section>
+      <section className="px-4 py-5">
+        {screenError ? (
+          <p
+            className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm"
+            style={{ color: '#b91c1c' }}
+          >
+            {screenError}
+          </p>
+        ) : null}
+
+        {captureState === 'loading' ? renderLoadingState() : null}
+        {captureState === 'input' || captureState === 'recording' ? renderInputState() : null}
+        {captureState === 'confirm' ? renderConfirmState() : null}
+      </section>
+    </div>
   )
 }
 
-export default Capture
+export default CaptureOverlay
+

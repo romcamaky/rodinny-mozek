@@ -3,11 +3,13 @@
 // Each function inserts into the correct Supabase table based on data type.
 
 import { supabase } from './supabase'
-import type { MealPlan, Note, Place, Task } from '../types/database'
+import type { MealPlan, Milestone, MilestoneLog, MilestoneTask, Note, Place, Task } from '../types/database'
 import type { NoteData, PlaceData, TaskData } from './voiceRouter'
 
 // Temporary hardcoded user ID — replaced with real auth in Phase 3
 export const TEMP_USER_ID = '00000000-0000-0000-0000-000000000001'
+
+export type { Milestone, MilestoneLog, MilestoneTask }
 
 export type TaskAssigneeFilter = 'all' | 'romi' | 'petr' | 'both'
 /** active = todo + in_progress; done = only done; all = every status */
@@ -302,9 +304,179 @@ export async function savePlace(data: SavePlaceInput) {
   return inserted
 }
 
-// TODO: Insert into milestones table when it exists (Phase 3)
-export async function saveMilestone(data: MilestoneData): Promise<void> {
-  console.log('[saveMilestone] TODO: persist to milestones table', data)
+async function saveMilestoneFromVoiceRouter(data: MilestoneData): Promise<void> {
+  // Voice-router milestones only provide title/description. For now we store them
+  // as "developmental" milestones with an unknown child name.
+  await saveMilestone({
+    title: data.title,
+    child_name: '',
+    category: 'developmental',
+    description: data.description ?? undefined,
+  })
+}
+
+// --- Milestones ---
+
+export async function fetchMilestones(
+  status?: 'active' | 'paused' | 'completed',
+): Promise<Milestone[]> {
+  let query = supabase
+    .from('milestones')
+    .select('*')
+    .eq('user_id', TEMP_USER_ID)
+    .order('created_at', { ascending: false })
+
+  if (status) {
+    query = query.eq('status', status)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as Milestone[]
+}
+
+export async function saveMilestone(milestone: {
+  title: string
+  child_name: string
+  category: 'life_skill' | 'developmental'
+  description?: string
+}): Promise<Milestone> {
+  const { data, error } = await supabase
+    .from('milestones')
+    .insert({
+      ...milestone,
+      user_id: TEMP_USER_ID,
+      description:
+        milestone.description !== undefined && milestone.description.trim() !== ''
+          ? milestone.description.trim()
+          : null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return data as Milestone
+}
+
+export async function updateMilestoneStatus(
+  id: string,
+  status: 'active' | 'paused' | 'completed',
+): Promise<void> {
+  const update: { status: 'active' | 'paused' | 'completed'; completed_at: string | null } = {
+    status,
+    completed_at: status === 'completed' ? new Date().toISOString() : null,
+  }
+
+  const { error } = await supabase
+    .from('milestones')
+    .update(update)
+    .eq('id', id)
+    .eq('user_id', TEMP_USER_ID)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+}
+
+export async function deleteMilestone(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('milestones')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', TEMP_USER_ID)
+
+  if (error) {
+    throw new Error(error.message)
+  }
+}
+
+// --- Milestone Logs ---
+
+export async function fetchMilestoneLogs(milestoneId: string): Promise<MilestoneLog[]> {
+  const { data, error } = await supabase
+    .from('milestone_logs')
+    .select('*')
+    .eq('milestone_id', milestoneId)
+    .eq('user_id', TEMP_USER_ID)
+    .order('logged_at', { ascending: false })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as MilestoneLog[]
+}
+
+export async function saveMilestoneLog(log: {
+  milestone_id: string
+  note: string
+  source: 'voice' | 'text'
+  ai_response?: string
+}): Promise<MilestoneLog> {
+  const { data, error } = await supabase
+    .from('milestone_logs')
+    .insert({
+      ...log,
+      user_id: TEMP_USER_ID,
+      ai_response:
+        log.ai_response !== undefined && log.ai_response.trim() !== ''
+          ? log.ai_response.trim()
+          : null,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return data as MilestoneLog
+}
+
+// --- Milestone Tasks ---
+
+export async function fetchMilestoneTasks(milestoneId: string): Promise<MilestoneTask | null> {
+  const { data, error } = await supabase
+    .from('milestone_tasks')
+    .select('*')
+    .eq('milestone_id', milestoneId)
+    .eq('user_id', TEMP_USER_ID)
+    .order('week_start', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(error.message)
+  }
+
+  return (data ?? null) as MilestoneTask | null
+}
+
+export async function saveMilestoneTasks(task: {
+  milestone_id: string
+  week_start: string
+  tasks: Array<{ task: string; done: boolean }>
+}): Promise<MilestoneTask> {
+  const { data, error } = await supabase
+    .from('milestone_tasks')
+    .insert({
+      ...task,
+      user_id: TEMP_USER_ID,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return data as MilestoneTask
 }
 
 /**
@@ -328,7 +500,7 @@ export async function saveClassifiedData(
         await savePlace(classification.data as SavePlaceInput)
         return { success: true, target: classification.target }
       case 'milestone':
-        await saveMilestone(classification.data as MilestoneData)
+        await saveMilestoneFromVoiceRouter(classification.data as MilestoneData)
         return { success: true, target: classification.target }
       default:
         return {

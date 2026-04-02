@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import PlaceForm from '../components/PlaceForm'
 import {
   deletePlace,
@@ -328,13 +327,14 @@ function Places() {
             Zatím žádná místa. Přidej první tip! 📍
           </p>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Link
-              to="/capture"
+            <button
               className="inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold text-white"
               style={{ backgroundColor: 'var(--color-primary)' }}
+              type="button"
+              onClick={() => window.dispatchEvent(new Event('open-capture'))}
             >
               Zachytit hlasem
-            </Link>
+            </button>
             <button
               type="button"
               className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold"

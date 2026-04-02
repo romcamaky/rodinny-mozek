@@ -73,3 +73,43 @@ export interface MealPlan {
   created_at: string
   updated_at: string
 }
+
+// Milestone: a developmental goal being tracked for a child
+export interface Milestone {
+  id: string
+  user_id: string
+  title: string
+  child_name: string
+  category: 'life_skill' | 'developmental'
+  description: string | null
+  status: 'active' | 'paused' | 'completed'
+  started_at: string
+  completed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+// MilestoneLog: a single progress entry for a milestone
+export interface MilestoneLog {
+  id: string
+  user_id: string
+  milestone_id: string
+  note: string
+  source: 'voice' | 'text'
+  ai_response: string | null
+  logged_at: string
+  created_at: string
+  updated_at: string
+}
+
+// MilestoneTask: AI-generated weekly micro-tasks for a milestone
+export interface MilestoneTask {
+  id: string
+  user_id: string
+  milestone_id: string
+  week_start: string
+  tasks: Array<{ task: string; done: boolean }>
+  generated_at: string
+  created_at: string
+  updated_at: string
+}

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { deleteNote, fetchNotes, type NoteCategoryFilter } from '../lib/dataService'
 import type { Note } from '../types/database'
 import { formatRelativeTime } from '../lib/utils'
@@ -146,13 +145,14 @@ function Notes() {
           <p className="text-base" style={{ color: 'var(--color-text-secondary)' }}>
             Žádné poznámky. Zachyť první myšlenku! 💡
           </p>
-          <Link
-            to="/capture"
+          <button
+            type="button"
             className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold text-white"
             style={{ backgroundColor: 'var(--color-primary)' }}
+            onClick={() => window.dispatchEvent(new Event('open-capture'))}
           >
             Zachytit
-          </Link>
+          </button>
         </div>
       ) : (
         <ul className="mt-4 flex list-none flex-col gap-3 p-0">

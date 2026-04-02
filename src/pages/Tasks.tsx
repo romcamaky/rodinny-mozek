@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   deleteTask,
   fetchTasks,
@@ -189,13 +188,14 @@ function Tasks() {
           <p className="text-base" style={{ color: 'var(--color-text-secondary)' }}>
             Žádné úkoly. Zachyť první přes mikrofon! 🎤
           </p>
-          <Link
-            to="/capture"
+          <button
+            type="button"
             className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-semibold text-white"
             style={{ backgroundColor: 'var(--color-primary)' }}
+            onClick={() => window.dispatchEvent(new Event('open-capture'))}
           >
             Zachytit
-          </Link>
+          </button>
         </div>
       ) : (
         <ul className="mt-4 flex list-none flex-col gap-3 p-0">
