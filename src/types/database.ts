@@ -67,8 +67,8 @@ export interface MealPlan {
   week_start: string
   variant: 'A' | 'B'
   plan_data: Record<string, unknown>
-  batch_cooking: Record<string, unknown>
-  shopping_list: Record<string, unknown>
+  batch_cooking: unknown
+  shopping_list: unknown
   status: 'draft' | 'active' | 'archived'
   created_at: string
   updated_at: string

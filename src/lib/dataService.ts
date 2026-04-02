@@ -3,7 +3,7 @@
 // Each function inserts into the correct Supabase table based on data type.
 
 import { supabase } from './supabase'
-import type { Note, Place, Task } from '../types/database'
+import type { MealPlan, Note, Place, Task } from '../types/database'
 import type { NoteData, PlaceData, TaskData } from './voiceRouter'
 
 // Temporary hardcoded user ID — replaced with real auth in Phase 3
@@ -346,4 +346,203 @@ export async function saveClassifiedData(
       error: message,
     }
   }
+}
+
+// --- Meal planner: HTTP to `generate-meal-plan` Edge Function; rows in `meal_plans`. ---
+
+export type MealPlanPreferences = {
+  availableIngredients?: string
+  excludeIngredients?: string
+}
+
+export type RejectedMealInput = {
+  day: string
+  mealType: string
+  reason?: string
+}
+
+/** One shopping line item inside a Rohlik category bucket. */
+export type ShoppingListItemRow = {
+  name: string
+  quantity: string
+  unit: string
+}
+
+/** Parsed payload returned by Claude from the Edge Function (matches prompt JSON). */
+export type GeneratedMealPlanPayload = {
+  plan_data: Record<string, Record<string, { name: string; note?: string }>>
+  batch_cooking: BatchCookingBlock[]
+  shopping_list: Record<string, ShoppingListItemRow[]>
+}
+
+export type BatchCookingBlock = {
+  cook_day: string
+  meals_covered: string[]
+  recipes: {
+    name: string
+    tm_time_minutes?: number
+    portions?: number
+    note?: string
+  }[]
+}
+
+function mealPlanFunctionUrl(): string {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+  return `${supabaseUrl}/functions/v1/generate-meal-plan`
+}
+
+function mealPlanFetchHeaders(): HeadersInit {
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+  return {
+    Authorization: `Bearer ${key}`,
+    'Content-Type': 'application/json',
+  }
+}
+
+async function parseMealPlanError(response: Response): Promise<string> {
+  const body = (await response.json().catch(() => ({}))) as {
+    error?: string
+    details?: string
+  }
+  return body.error ?? body.details ?? `Edge Function error: ${response.status}`
+}
+
+/**
+ * Calls generate-meal-plan in full mode — hits Supabase Edge Function → Anthropic.
+ */
+export async function generateMealPlan(
+  weekStart: string,
+  preferences?: MealPlanPreferences,
+): Promise<GeneratedMealPlanPayload> {
+  const body: Record<string, unknown> = {
+    mode: 'full',
+    week_start: weekStart,
+  }
+  const avail = preferences?.availableIngredients?.trim()
+  const excl = preferences?.excludeIngredients?.trim()
+  if (avail || excl) {
+    body.preferences = {
+      ...(avail ? { availableIngredients: avail } : {}),
+      ...(excl ? { excludeIngredients: excl } : {}),
+    }
+  }
+
+  const response = await fetch(mealPlanFunctionUrl(), {
+    method: 'POST',
+    headers: mealPlanFetchHeaders(),
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    throw new Error(await parseMealPlanError(response))
+  }
+
+  return (await response.json()) as GeneratedMealPlanPayload
+}
+
+/**
+ * Replace one meal slot; Edge Function returns the full updated plan object.
+ */
+export async function replaceMeal(
+  weekStart: string,
+  existingPlan: GeneratedMealPlanPayload,
+  rejectedMeal: RejectedMealInput,
+): Promise<GeneratedMealPlanPayload> {
+  const response = await fetch(mealPlanFunctionUrl(), {
+    method: 'POST',
+    headers: mealPlanFetchHeaders(),
+    body: JSON.stringify({
+      mode: 'replace_meal',
+      week_start: weekStart,
+      existing_plan: existingPlan,
+      rejected_meal: rejectedMeal,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(await parseMealPlanError(response))
+  }
+
+  return (await response.json()) as GeneratedMealPlanPayload
+}
+
+/**
+ * Insert or update a row for this user/week/variant and mark it active.
+ */
+export async function saveMealPlan(
+  weekStart: string,
+  variant: 'A' | 'B',
+  planData: GeneratedMealPlanPayload['plan_data'],
+  batchCooking: GeneratedMealPlanPayload['batch_cooking'],
+  shoppingList: GeneratedMealPlanPayload['shopping_list'],
+): Promise<{ success: boolean; error?: string }> {
+  const { data: existing, error: findError } = await supabase
+    .from('meal_plans')
+    .select('id')
+    .eq('user_id', TEMP_USER_ID)
+    .eq('week_start', weekStart)
+    .eq('variant', variant)
+    .maybeSingle()
+
+  if (findError) {
+    return { success: false, error: findError.message }
+  }
+
+  const row = {
+    user_id: TEMP_USER_ID,
+    week_start: weekStart,
+    variant,
+    plan_data: planData,
+    batch_cooking: batchCooking,
+    shopping_list: shoppingList,
+    status: 'active' as const,
+  }
+
+  if (existing?.id) {
+    const { error } = await supabase.from('meal_plans').update(row).eq('id', existing.id)
+    if (error) {
+      return { success: false, error: error.message }
+    }
+  } else {
+    const { error } = await supabase.from('meal_plans').insert(row)
+    if (error) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  return { success: true }
+}
+
+/** All stored variants for a calendar week (typically A and/or B). */
+export async function fetchMealPlan(weekStart: string): Promise<MealPlan[]> {
+  const { data, error } = await supabase
+    .from('meal_plans')
+    .select('*')
+    .eq('user_id', TEMP_USER_ID)
+    .eq('week_start', weekStart)
+    .order('variant', { ascending: true })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data ?? []) as MealPlan[]
+}
+
+/** Latest active plan across weeks (used when opening the meal planner). */
+export async function fetchActiveMealPlan(): Promise<MealPlan | null> {
+  const { data, error } = await supabase
+    .from('meal_plans')
+    .select('*')
+    .eq('user_id', TEMP_USER_ID)
+    .eq('status', 'active')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  return (data as MealPlan | null) ?? null
 }
