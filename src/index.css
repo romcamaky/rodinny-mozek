@@ -140,6 +140,21 @@
   color: var(--color-text-secondary);
 }
 
+/* Ensure input text is always readable in both light and dark mode */
+input,
+textarea {
+  color: var(--color-text-primary);
+  background-color: var(--color-input-bg);
+  caret-color: var(--color-text-primary);
+}
+
+/* Placeholder text — slightly muted */
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1;
+}
+
 /* Adds a 3px rainbow gradient bar at the top of any card */
 .card-rainbow {
   position: relative;

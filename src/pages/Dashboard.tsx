@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CURRENT_USER_ID } from '../lib/constants'
+import { getCurrentUserId } from '../lib/dataService'
 import { supabase } from '../lib/supabase'
 import { getCheckinForWeek, getWeekStart } from '../lib/wellbeingService'
 
@@ -39,10 +39,11 @@ function Dashboard() {
   }, [loadWellbeingStatus])
 
   const loadActiveMilestoneCount = useCallback(async () => {
+    const userId = await getCurrentUserId()
     const { count, error } = await supabase
       .from('milestones')
       .select('id', { count: 'exact', head: true })
-      .eq('user_id', CURRENT_USER_ID)
+      .eq('user_id', userId)
       .eq('status', 'active')
 
     if (error || count === null || count === 0) {

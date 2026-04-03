@@ -1,14 +1,21 @@
 // Data service — handles all Supabase CRUD operations.
-// Uses a hardcoded user_id until auth is activated in Phase 3.
-// Each function inserts into the correct Supabase table based on data type.
+// Rows are scoped to the signed-in user via getCurrentUserId().
 
 import { supabase } from './supabase'
 import { CURRENT_USER_ID } from './constants'
 import type { MealPlan, Milestone, MilestoneLog, MilestoneTask, Note, Place, Task } from '../types/database'
 import type { NoteData, PlaceData, TaskData } from './voiceRouter'
 
-/** Re-export for legacy imports; prefer `CURRENT_USER_ID` from `./constants`. */
+/** Re-export for legacy imports; prefer `getCurrentUserId()` at runtime. */
 export const TEMP_USER_ID = CURRENT_USER_ID
+
+/** Authenticated user id; `CURRENT_USER_ID` only if session is missing unexpectedly. */
+export async function getCurrentUserId(): Promise<string> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  return session?.user?.id ?? CURRENT_USER_ID
+}
 
 export type { Milestone, MilestoneLog, MilestoneTask }
 
@@ -24,13 +31,14 @@ export async function fetchTasks(filters?: {
   assigned_to?: TaskAssigneeFilter
   status?: TaskStatusFilter
 }): Promise<Task[]> {
+  const userId = await getCurrentUserId()
   const assignedTo = filters?.assigned_to ?? 'all'
   const statusFilter = filters?.status ?? 'active'
 
   let query = supabase
     .from('tasks')
     .select('*')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
   if (assignedTo !== 'all') {
@@ -58,12 +66,13 @@ export async function fetchTasks(filters?: {
 export async function fetchNotes(filters?: {
   category?: NoteCategoryFilter
 }): Promise<Note[]> {
+  const userId = await getCurrentUserId()
   const category = filters?.category ?? 'all'
 
   let query = supabase
     .from('notes')
     .select('*')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
   if (category !== 'all') {
@@ -83,11 +92,12 @@ export async function updateTaskStatus(
   taskId: string,
   newStatus: Task['status'],
 ): Promise<{ success: boolean; error?: string }> {
+  const userId = await getCurrentUserId()
   const { error } = await supabase
     .from('tasks')
     .update({ status: newStatus })
     .eq('id', taskId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) {
     return { success: false, error: error.message }
@@ -98,11 +108,12 @@ export async function updateTaskStatus(
 export async function deleteTask(
   taskId: string,
 ): Promise<{ success: boolean; error?: string }> {
+  const userId = await getCurrentUserId()
   const { error } = await supabase
     .from('tasks')
     .delete()
     .eq('id', taskId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) {
     return { success: false, error: error.message }
@@ -113,11 +124,12 @@ export async function deleteTask(
 export async function deleteNote(
   noteId: string,
 ): Promise<{ success: boolean; error?: string }> {
+  const userId = await getCurrentUserId()
   const { error } = await supabase
     .from('notes')
     .delete()
     .eq('id', noteId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) {
     return { success: false, error: error.message }
@@ -142,10 +154,11 @@ export async function fetchPlaces(filters?: {
   tags?: string[]
   source?: PlaceSourceFilter
 }): Promise<Place[]> {
+  const userId = await getCurrentUserId()
   let query = supabase
     .from('places')
     .select('*')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
   const source = filters?.source ?? 'all'
@@ -170,11 +183,12 @@ export async function fetchPlaces(filters?: {
 export async function deletePlace(
   placeId: string,
 ): Promise<{ success: boolean; error?: string }> {
+  const userId = await getCurrentUserId()
   const { error } = await supabase
     .from('places')
     .delete()
     .eq('id', placeId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) {
     return { success: false, error: error.message }
@@ -201,6 +215,7 @@ export async function saveTask(
   source: 'voice' | 'text',
   visibility: 'shared' | 'private',
 ) {
+  const userId = await getCurrentUserId()
   const description =
     data.description !== undefined && data.description.trim() !== ''
       ? data.description.trim()
@@ -211,7 +226,7 @@ export async function saveTask(
       : null
 
   const row = {
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
     title: data.title.trim(),
     description,
     assigned_to: data.assigned_to,
@@ -240,8 +255,9 @@ export async function saveNote(
   source: 'voice' | 'text',
   visibility: 'shared' | 'private',
 ) {
+  const userId = await getCurrentUserId()
   const row = {
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
     text: data.text.trim(),
     category: data.category,
     source,
@@ -263,6 +279,7 @@ export async function saveNote(
 
 // Maps place form data to the `places` row; geo/source_url left null unless provided later.
 export async function savePlace(data: SavePlaceInput) {
+  const userId = await getCurrentUserId()
   const address =
     data.address !== undefined && data.address.trim() !== ''
       ? data.address.trim()
@@ -279,7 +296,7 @@ export async function savePlace(data: SavePlaceInput) {
       : null
 
   const row = {
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
     name: data.name.trim(),
     address,
     latitude: null as number | null,
@@ -321,10 +338,11 @@ async function saveMilestoneFromVoiceRouter(data: MilestoneData): Promise<void> 
 export async function fetchMilestones(
   status?: 'active' | 'paused' | 'completed',
 ): Promise<Milestone[]> {
+  const userId = await getCurrentUserId()
   let query = supabase
     .from('milestones')
     .select('*')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
 
   if (status) {
@@ -345,11 +363,12 @@ export async function saveMilestone(milestone: {
   category: 'life_skill' | 'developmental'
   description?: string
 }): Promise<Milestone> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('milestones')
     .insert({
       ...milestone,
-      user_id: CURRENT_USER_ID,
+      user_id: userId,
       description:
         milestone.description !== undefined && milestone.description.trim() !== ''
           ? milestone.description.trim()
@@ -369,6 +388,7 @@ export async function updateMilestoneStatus(
   id: string,
   status: 'active' | 'paused' | 'completed',
 ): Promise<void> {
+  const userId = await getCurrentUserId()
   const update: { status: 'active' | 'paused' | 'completed'; completed_at: string | null } = {
     status,
     completed_at: status === 'completed' ? new Date().toISOString() : null,
@@ -378,7 +398,7 @@ export async function updateMilestoneStatus(
     .from('milestones')
     .update(update)
     .eq('id', id)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) {
     throw new Error(error.message)
@@ -386,11 +406,12 @@ export async function updateMilestoneStatus(
 }
 
 export async function deleteMilestone(id: string): Promise<void> {
+  const userId = await getCurrentUserId()
   const { error } = await supabase
     .from('milestones')
     .delete()
     .eq('id', id)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) {
     throw new Error(error.message)
@@ -400,11 +421,12 @@ export async function deleteMilestone(id: string): Promise<void> {
 // --- Milestone Logs ---
 
 export async function fetchMilestoneLogs(milestoneId: string): Promise<MilestoneLog[]> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('milestone_logs')
     .select('*')
     .eq('milestone_id', milestoneId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .order('logged_at', { ascending: false })
 
   if (error) {
@@ -420,11 +442,12 @@ export async function saveMilestoneLog(log: {
   source: 'voice' | 'text'
   ai_response?: string
 }): Promise<MilestoneLog> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('milestone_logs')
     .insert({
       ...log,
-      user_id: CURRENT_USER_ID,
+      user_id: userId,
       ai_response:
         log.ai_response !== undefined && log.ai_response.trim() !== ''
           ? log.ai_response.trim()
@@ -443,11 +466,12 @@ export async function saveMilestoneLog(log: {
 // --- Milestone Tasks ---
 
 export async function fetchMilestoneTasks(milestoneId: string): Promise<MilestoneTask | null> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('milestone_tasks')
     .select('*')
     .eq('milestone_id', milestoneId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .order('week_start', { ascending: false })
     .limit(1)
     .single()
@@ -464,11 +488,12 @@ export async function saveMilestoneTasks(task: {
   week_start: string
   tasks: Array<{ task: string; done: boolean }>
 }): Promise<MilestoneTask> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('milestone_tasks')
     .insert({
       ...task,
-      user_id: CURRENT_USER_ID,
+      user_id: userId,
     })
     .select()
     .single()
@@ -649,10 +674,11 @@ export async function saveMealPlan(
   batchCooking: GeneratedMealPlanPayload['batch_cooking'],
   shoppingList: GeneratedMealPlanPayload['shopping_list'],
 ): Promise<{ success: boolean; error?: string }> {
+  const userId = await getCurrentUserId()
   const { data: existing, error: findError } = await supabase
     .from('meal_plans')
     .select('id')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .eq('week_start', weekStart)
     .eq('variant', variant)
     .maybeSingle()
@@ -662,7 +688,7 @@ export async function saveMealPlan(
   }
 
   const row = {
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
     week_start: weekStart,
     variant,
     plan_data: planData,
@@ -688,10 +714,11 @@ export async function saveMealPlan(
 
 /** All stored variants for a calendar week (typically A and/or B). */
 export async function fetchMealPlan(weekStart: string): Promise<MealPlan[]> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('meal_plans')
     .select('*')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .eq('week_start', weekStart)
     .order('variant', { ascending: true })
 
@@ -704,10 +731,11 @@ export async function fetchMealPlan(weekStart: string): Promise<MealPlan[]> {
 
 /** Latest active plan across weeks (used when opening the meal planner). */
 export async function fetchActiveMealPlan(): Promise<MealPlan | null> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('meal_plans')
     .select('*')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .eq('status', 'active')
     .order('updated_at', { ascending: false })
     .limit(1)

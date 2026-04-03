@@ -1,5 +1,5 @@
 /**
- * Temporary single-user id until auth is activated in Phase 3.
- * All Supabase rows and edge-function bodies filter by this value.
+ * Fallback user id only when `getCurrentUserId()` finds no Supabase session (unexpected
+ * while routes are protected). Prefer `session.user.id` for all data access.
  */
-export const CURRENT_USER_ID = '00000000-0000-0000-0000-000000000001';
+export const CURRENT_USER_ID = '00000000-0000-0000-0000-000000000001'

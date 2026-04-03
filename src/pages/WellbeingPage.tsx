@@ -5,7 +5,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { formatCzechLongDate } from '../lib/dateUtils'
-import { CURRENT_USER_ID } from '../lib/constants'
+import { getCurrentUserId } from '../lib/dataService'
 import {
   getCheckinForWeek,
   getCheckinHistory,
@@ -222,8 +222,9 @@ function WellbeingPage() {
     if (!lastWeekRow) return
     setSavingReflection(true)
     try {
+      const userId = await getCurrentUserId()
       await saveReflection({
-        userId: CURRENT_USER_ID,
+        userId,
         checkinId: lastWeekRow.id,
         myNeedsDone: [...reflMyDone],
         ourNeedsDone: [...reflOurDone],
@@ -250,8 +251,9 @@ function WellbeingPage() {
     }
     setSavingCheckin(true)
     try {
+      const userId = await getCurrentUserId()
       const row = await upsertCheckin({
-        userId: CURRENT_USER_ID,
+        userId,
         weekStart,
         myNeeds: mySelected,
         ourNeeds: ourSelected,

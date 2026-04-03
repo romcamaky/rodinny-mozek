@@ -515,8 +515,11 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
         <form className="mt-10 w-full" onSubmit={(event) => void handleTextSubmit(event)}>
           <textarea
             ref={textAreaRef}
-            className="w-full resize-none rounded-2xl border bg-white px-4 py-3 text-base"
-            style={{ borderColor: '#cbd5e1', lineHeight: '24px' }}
+            className="w-full resize-none rounded-2xl border px-4 py-3 text-base"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--color-text-secondary) 35%, transparent)',
+              lineHeight: '24px',
+            }}
             placeholder="...nebo napiš sem"
             value={textInput}
             rows={2}

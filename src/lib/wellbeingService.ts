@@ -3,8 +3,8 @@
  * Maps DB snake_case to camelCase domain types from `src/types/wellbeing.ts`.
  */
 
+import { getCurrentUserId } from './dataService'
 import { supabase } from './supabase'
-import { CURRENT_USER_ID } from './constants'
 import { getWeekStartIsoUtc } from './dateUtils'
 import type {
   CheckinWithReflection,
@@ -84,10 +84,11 @@ function rowToWeeklyReflection(row: Record<string, unknown>): WeeklyReflection {
  */
 export async function getCheckinForWeek(weekStart: string): Promise<WeeklyCheckin | null> {
   try {
+    const userId = await getCurrentUserId()
     const { data, error } = await supabase
       .from('weekly_checkins')
       .select('*')
-      .eq('user_id', CURRENT_USER_ID)
+      .eq('user_id', userId)
       .eq('week_start', weekStart)
       .maybeSingle()
 
@@ -145,10 +146,11 @@ export async function upsertCheckin(
  */
 export async function getReflectionForCheckin(checkinId: string): Promise<WeeklyReflection | null> {
   try {
+    const userId = await getCurrentUserId()
     const { data, error } = await supabase
       .from('weekly_reflections')
       .select('*')
-      .eq('user_id', CURRENT_USER_ID)
+      .eq('user_id', userId)
       .eq('checkin_id', checkinId)
       .maybeSingle()
 
@@ -207,10 +209,11 @@ export async function getCheckinHistory(limit: number = 12): Promise<CheckinWith
     const safeLimit = Math.min(Math.max(1, Math.floor(limit)), 50)
     const fetchCount = Math.min(safeLimit + 15, 40)
 
+    const userId = await getCurrentUserId()
     const { data: checkinRows, error: checkinError } = await supabase
       .from('weekly_checkins')
       .select('*')
-      .eq('user_id', CURRENT_USER_ID)
+      .eq('user_id', userId)
       .order('week_start', { ascending: false })
       .limit(fetchCount)
 
@@ -228,7 +231,7 @@ export async function getCheckinHistory(limit: number = 12): Promise<CheckinWith
       const { data: reflRows, error: reflError } = await supabase
         .from('weekly_reflections')
         .select('*')
-        .eq('user_id', CURRENT_USER_ID)
+        .eq('user_id', userId)
         .in('checkin_id', ids)
 
       if (reflError) {
@@ -256,10 +259,11 @@ export async function getCheckinHistory(limit: number = 12): Promise<CheckinWith
 export async function getRecentCheckins(limit: number): Promise<WeeklyCheckin[]> {
   try {
     const safeLimit = Math.min(Math.max(1, Math.floor(limit)), 50)
+    const userId = await getCurrentUserId()
     const { data, error } = await supabase
       .from('weekly_checkins')
       .select('*')
-      .eq('user_id', CURRENT_USER_ID)
+      .eq('user_id', userId)
       .order('week_start', { ascending: false })
       .limit(safeLimit)
 

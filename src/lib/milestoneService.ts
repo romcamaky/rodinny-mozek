@@ -1,10 +1,9 @@
 /**
  * Supabase access + milestone-ai edge calls for the Kids Development Tracker.
- * Uses CURRENT_USER_ID until real auth replaces it (Phase 3).
  */
 
+import { getCurrentUserId } from './dataService'
 import { supabase } from './supabase'
-import { CURRENT_USER_ID } from './constants'
 import { getWeekStartIsoUtc } from './dateUtils'
 import type {
   ActivityItem,
@@ -16,8 +15,6 @@ import type {
   TaskItem,
   WeeklyActivities,
 } from '../types/milestones'
-
-export { CURRENT_USER_ID }
 
 function milestoneAiUrl(): string {
   const base = import.meta.env.VITE_SUPABASE_URL as string
@@ -142,10 +139,11 @@ const STATUS_SORT: Record<Milestone['status'], number> = {
  * All milestones for the temp user, ordered active → paused → completed, then updated_at DESC.
  */
 export async function fetchMilestonesOrdered(): Promise<Milestone[]> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('milestones')
     .select('*')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) throw new Error(error.message)
   const rows = (data ?? []) as Record<string, unknown>[]
@@ -167,10 +165,11 @@ export async function fetchLatestLogDatesByMilestone(
   const map = new Map<string, string>()
   if (milestoneIds.length === 0) return map
 
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('milestone_logs')
     .select('milestone_id, logged_at')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .in('milestone_id', milestoneIds)
     .order('logged_at', { ascending: false })
 
@@ -185,11 +184,12 @@ export async function fetchLatestLogDatesByMilestone(
 }
 
 export async function fetchMilestoneById(id: string): Promise<Milestone | null> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('milestones')
     .select('*')
     .eq('id', id)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .maybeSingle()
 
   if (error) throw new Error(error.message)
@@ -203,11 +203,12 @@ export async function insertMilestone(input: {
   category: 'life_skill' | 'developmental'
   description: string | null
 }): Promise<Milestone> {
+  const userId = await getCurrentUserId()
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('milestones')
     .insert({
-      user_id: CURRENT_USER_ID,
+      user_id: userId,
       child_name: input.child_name,
       title: input.title.trim(),
       category: input.category,
@@ -226,12 +227,13 @@ export async function updateMilestoneStatus(
   id: string,
   status: 'active' | 'paused' | 'completed',
 ): Promise<void> {
+  const userId = await getCurrentUserId()
   const completed_at = status === 'completed' ? new Date().toISOString() : null
   const { error } = await supabase
     .from('milestones')
     .update({ status, completed_at, updated_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) throw new Error(error.message)
 }
@@ -240,12 +242,13 @@ export async function updateMilestoneStatus(
 export async function fetchMilestoneTaskCurrentWeek(
   milestoneId: string,
 ): Promise<MilestoneTask | null> {
+  const userId = await getCurrentUserId()
   const weekStart = getWeekStartIsoUtc()
   const { data, error } = await supabase
     .from('milestone_tasks')
     .select('*')
     .eq('milestone_id', milestoneId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .eq('week_start', weekStart)
     .maybeSingle()
 
@@ -258,9 +261,10 @@ export async function fetchMilestoneTaskCurrentWeek(
  * Calls edge `generate_tasks`, then reloads the current week row from DB.
  */
 export async function generateTasksForMilestone(milestoneId: string): Promise<MilestoneTask> {
+  const userId = await getCurrentUserId()
   const ai = await postMilestoneAi({
     mode: 'generate_tasks',
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
     milestone_id: milestoneId,
   })
   if (!ai.ok) throw new Error(ai.error)
@@ -279,12 +283,13 @@ export async function updateMilestoneTasksDone(
   taskRowId: string,
   tasks: TaskItem[],
 ): Promise<void> {
+  const userId = await getCurrentUserId()
   const now = new Date().toISOString()
   const { error } = await supabase
     .from('milestone_tasks')
     .update({ tasks, updated_at: now })
     .eq('id', taskRowId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) throw new Error(error.message)
 }
@@ -293,11 +298,12 @@ export async function insertMilestoneLog(input: {
   milestone_id: string
   note: string
 }): Promise<MilestoneLog> {
+  const userId = await getCurrentUserId()
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('milestone_logs')
     .insert({
-      user_id: CURRENT_USER_ID,
+      user_id: userId,
       milestone_id: input.milestone_id,
       note: input.note.trim(),
       source: 'text',
@@ -319,9 +325,10 @@ export async function evaluateMilestoneLog(
   logId: string,
   newLogNote: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const userId = await getCurrentUserId()
   const result = await postMilestoneAi({
     mode: 'evaluate',
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
     milestone_id: milestoneId,
     log_id: logId,
     new_log_note: newLogNote.trim(),
@@ -331,11 +338,12 @@ export async function evaluateMilestoneLog(
 }
 
 export async function fetchMilestoneLogs(milestoneId: string): Promise<MilestoneLog[]> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('milestone_logs')
     .select('*')
     .eq('milestone_id', milestoneId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .order('logged_at', { ascending: false })
 
   if (error) throw new Error(error.message)
@@ -346,9 +354,10 @@ export async function askMilestoneQuestion(
   milestoneId: string,
   question: string,
 ): Promise<AiAskResponse> {
+  const userId = await getCurrentUserId()
   const result = await postMilestoneAi({
     mode: 'ask',
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
     milestone_id: milestoneId,
     question: question.trim(),
   })
@@ -473,10 +482,11 @@ function parsePlanFromAiData(data: Record<string, unknown>): WeeklyActivities {
 export async function fetchWeeklyActivities(
   weekStart: string,
 ): Promise<WeeklyActivities | null> {
+  const userId = await getCurrentUserId()
   const { data, error } = await supabase
     .from('weekly_activities')
     .select('*')
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
     .eq('week_start', weekStart)
     .maybeSingle()
 
@@ -492,9 +502,10 @@ export async function fetchWeeklyActivities(
 export async function generateWeeklyActivities(
   difficultyLevel?: string,
 ): Promise<WeeklyActivities> {
+  const userId = await getCurrentUserId()
   const body: Record<string, unknown> = {
     mode: 'suggest_activities',
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
   }
   const d = difficultyLevel?.trim()
   if (d === 'easier' || d === 'normal' || d === 'harder') {
@@ -510,9 +521,10 @@ export async function replaceActivity(
   activityId: string,
   reason?: string,
 ): Promise<WeeklyActivities> {
+  const userId = await getCurrentUserId()
   const body: Record<string, unknown> = {
     mode: 'replace_activity',
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
     activity_id: activityId,
   }
   const r = reason?.trim()
@@ -526,9 +538,10 @@ export async function replaceActivity(
 export async function adjustDifficulty(
   difficultyLevel: 'easier' | 'harder',
 ): Promise<WeeklyActivities> {
+  const userId = await getCurrentUserId()
   const result = await postMilestoneAi({
     mode: 'adjust_difficulty',
-    user_id: CURRENT_USER_ID,
+    user_id: userId,
     difficulty_level: difficultyLevel,
   })
   if (!result.ok) throw new Error(result.error)
@@ -543,6 +556,7 @@ export async function toggleActivityDone(
   activityId: string,
   activities: ActivityItem[],
 ): Promise<void> {
+  const userId = await getCurrentUserId()
   const next = activities.map((a) =>
     a.id === activityId ? { ...a, done: !a.done } : a,
   )
@@ -551,7 +565,7 @@ export async function toggleActivityDone(
     .from('weekly_activities')
     .update({ activities: next, updated_at: now })
     .eq('id', weeklyActivitiesId)
-    .eq('user_id', CURRENT_USER_ID)
+    .eq('user_id', userId)
 
   if (error) throw new Error(error.message)
 }

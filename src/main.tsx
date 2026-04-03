@@ -6,22 +6,13 @@ import { initTheme } from './lib/theme'
 
 initTheme()
 
-// Unregister any existing service workers that may be caching stale responses.
-// We'll re-register a fixed service worker later.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    registrations.forEach((registration) => {
-      registration.unregister()
-      console.log('[SW] Unregistered service worker')
-    })
-  })
-}
-
+// Register service worker for PWA offline support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')
-      .catch((error) => console.error('Service worker registration failed:', error))
+      .then((reg) => console.log('SW registered:', reg.scope))
+      .catch((err) => console.error('SW registration failed:', err))
   })
 }
 

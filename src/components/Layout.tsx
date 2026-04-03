@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom'
+import { useAuth } from '../lib/authContext'
 import BottomNav from './BottomNav'
 import CaptureFAB from './CaptureFAB'
 import ThemeToggle from './ThemeToggle'
@@ -6,7 +7,19 @@ import ThemeToggle from './ThemeToggle'
 const TOP_BAR_HEIGHT = 56
 const BOTTOM_NAV_HEIGHT = 80
 
+function LogoutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" strokeLinecap="round" />
+      <path d="M16 17l5-5-5-5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 12H9" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 function Layout() {
+  const { logout } = useAuth()
+
   return (
     <div
       className="min-h-screen"
@@ -26,7 +39,19 @@ function Layout() {
           <span className="text-sm font-medium no-select" style={{ color: 'var(--color-text-secondary)' }}>
             Mozek 🧠
           </span>
-          <ThemeToggle />
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              className="no-select flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-[color:var(--color-border)]"
+              style={{ color: 'var(--color-text-secondary)' }}
+              onClick={() => void logout()}
+              aria-label="Odhlásit se"
+              title="Odhlásit se"
+            >
+              <LogoutIcon />
+            </button>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

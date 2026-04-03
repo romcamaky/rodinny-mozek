@@ -1,47 +1,75 @@
-const STATIC_CACHE = 'rodinny-mozek-static-v1'
-const APP_SHELL_FILES = ['/', '/index.html']
+const STATIC_CACHE = 'rodinny-mozek-static-v2'
 
-// During install, cache the core app shell so first paint works offline.
+/**
+ * App shell: HTML + manifest + icons. Hashed JS/CSS from Vite are cached on first
+ * successful fetch via the script/style handlers (not listed here — filenames change each build).
+ */
+const PRECACHE_URLS = [
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/apple-touch-icon.png',
+  '/favicon.svg',
+]
+
+function isSupabaseOrAnthropicApi(url) {
+  try {
+    const u = new URL(url)
+    return u.hostname.endsWith('supabase.co') || u.hostname.endsWith('anthropic.com')
+  } catch {
+    return false
+  }
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(APP_SHELL_FILES)),
+    caches
+      .open(STATIC_CACHE)
+      .then((cache) => cache.addAll(PRECACHE_URLS))
+      .catch((err) => {
+        console.warn('[SW] precache partial failure', err)
+        return caches.open(STATIC_CACHE).then((cache) =>
+          Promise.all(
+            PRECACHE_URLS.map((url) =>
+              cache.add(url).catch(() => {
+                /* ignore individual failures */
+              }),
+            ),
+          ),
+        )
+      }),
   )
   self.skipWaiting()
 })
 
-// During activation, remove outdated caches and take control immediately.
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
       .then((keys) =>
         Promise.all(
-          keys
-            .filter((key) => key !== STATIC_CACHE)
-            .map((key) => caches.delete(key)),
+          keys.filter((key) => key !== STATIC_CACHE).map((key) => caches.delete(key)),
         ),
       )
       .then(() => self.clients.claim()),
   )
 })
 
-// Intercept fetch requests and choose caching strategy.
 self.addEventListener('fetch', (event) => {
   const request = event.request
 
-  // NEVER intercept Supabase API calls — let them go straight to the network.
-  // This includes REST API (/rest/v1/), Auth (/auth/v1/), Edge Functions (/functions/v1/),
-  // and realtime WebSocket connections.
-  if (request.url.includes('supabase.co')) {
-    return // Don't call event.respondWith — browser handles normally
+  // Never intercept Supabase or Anthropic — no caching, browser handles (network / CORS).
+  if (isSupabaseOrAnthropicApi(request.url)) {
+    return
   }
 
-  // NEVER cache non-GET requests (POST, PUT, DELETE, etc.)
   if (request.method !== 'GET') {
     return
   }
 
-  // Cache-first for static assets (scripts, styles, images, fonts)
+  // Cache-first for static assets (Vite bundles, images, fonts)
   if (
     request.destination === 'script' ||
     request.destination === 'style' ||
@@ -50,7 +78,13 @@ self.addEventListener('fetch', (event) => {
   ) {
     event.respondWith(
       caches.match(request).then((cached) => {
-        return cached || fetch(request).then((response) => {
+        if (cached) {
+          return cached
+        }
+        return fetch(request).then((response) => {
+          if (!response || response.status !== 200 || response.type === 'error') {
+            return response
+          }
           const clone = response.clone()
           caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone))
           return response
@@ -60,11 +94,21 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Network-first for navigation (HTML pages) with offline fallback
+  // Network-first for navigations; offline → cached app shell
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html')),
+      fetch(request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone()
+            caches.open(STATIC_CACHE).then((cache) => cache.put(request, clone))
+          }
+          return response
+        })
+        .catch(() => caches.match('/index.html').then((c) => c || caches.match('/'))),
     )
     return
   }
+
+  // Everything else: default browser behavior (no caching)
 })
