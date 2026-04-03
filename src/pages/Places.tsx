@@ -248,7 +248,7 @@ function Places() {
           </button>
         ) : (
           <div
-            className="rounded-xl border p-3"
+            className="card-rainbow rounded-xl border p-3"
             style={{
               borderColor: '#e2e8f0',
               backgroundColor: 'var(--color-surface)',
@@ -318,7 +318,7 @@ function Places() {
         <PlacesSkeleton />
       ) : places.length === 0 && !pendingPlace ? (
         <div
-          className="mt-8 rounded-xl border border-dashed p-6 text-center"
+          className="card-rainbow mt-8 rounded-xl border border-dashed p-6 text-center"
           style={{
             borderColor: 'color-mix(in srgb, var(--color-text-secondary) 35%, transparent)',
           }}
@@ -354,7 +354,7 @@ function Places() {
             return (
               <li
                 key={place.id}
-                className="rounded-lg border p-3 shadow-sm"
+                className="card-rainbow rounded-lg border p-3 shadow-sm"
                 style={{
                   backgroundColor: 'var(--color-surface)',
                   borderColor: '#e2e8f0',

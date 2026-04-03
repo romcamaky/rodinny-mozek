@@ -1,12 +1,160 @@
 ﻿@import "tailwindcss";
 
+/*
+  RODINNÝ MOZEK — DESIGN TOKENS
+
+  How to use these variables:
+  - --color-bg: page background
+  - --color-surface: cards, inputs, modals
+  - --gradient-rainbow: the top 4px brand strip only
+  - --gradient-module-*: the 3px accent bar on each module card
+  - --color-module-*-bg: icon background and badge background for that module
+  - --color-module-*-text: badge text color for that module
+  - --color-btn-bg / --color-btn-text: primary action button (voice button, active tab)
+  - --radius-lg (14px): default for cards and containers
+  - --radius-full: pills and circular buttons
+
+  Dark mode: set on <html data-theme="dark">. If data-theme is omitted, initTheme() sets
+  light/dark from prefers-color-scheme until the user toggles (then preference is stored).
+  The --gradient-rainbow and --gradient-module-* values are identical in both modes.
+*/
+
 :root {
-  --color-primary: #6366f1;
-  --color-primary-dark: #4f46e5;
-  --color-bg: #f8fafc;
+  /* === BACKGROUNDS === */
+  --color-bg: #f8f4ff;
   --color-surface: #ffffff;
-  --color-text: #1e293b;
-  --color-text-secondary: #64748b;
+  --color-input-bg: #f0ebf8;
+
+  /* === TEXT === */
+  --color-text-primary: #1a1523;
+  --color-text-secondary: #6e6780;
+
+  /* === BORDERS === */
+  --color-border: rgba(0, 0, 0, 0.07);
+
+  /* === PRIMARY ACTION (voice button, active tab) === */
+  --color-btn-bg: #1a1523;
+  --color-btn-text: #ffffff;
+
+  /* === BRAND GRADIENT (top strip) === */
+  --gradient-rainbow: linear-gradient(90deg, #f472b6, #fb923c, #fbbf24, #34d399, #38bdf8, #a78bfa);
+
+  /* === MODULE COLORS — each module owns one color pair === */
+  /* Tasks & Notes (pink → peach) */
+  --color-module-tasks: #f472b6;
+  --color-module-tasks-bg: #fdf2f8;
+  --color-module-tasks-text: #9d174d;
+  --gradient-module-tasks: linear-gradient(90deg, #f472b6, #fb923c);
+
+  /* Places (yellow → mint) */
+  --color-module-places: #fbbf24;
+  --color-module-places-bg: #fffbeb;
+  --color-module-places-text: #92400e;
+  --gradient-module-places: linear-gradient(90deg, #fbbf24, #34d399);
+
+  /* Meal Planner (sky → lavender) */
+  --color-module-meals: #38bdf8;
+  --color-module-meals-bg: #f0f9ff;
+  --color-module-meals-text: #0c4a6e;
+  --gradient-module-meals: linear-gradient(90deg, #38bdf8, #a78bfa);
+
+  /* Family / Kids (lavender → pink, wraps the rainbow) */
+  --color-module-family: #a78bfa;
+  --color-module-family-bg: #f5f3ff;
+  --color-module-family-text: #4c1d95;
+  --gradient-module-family: linear-gradient(90deg, #a78bfa, #f472b6);
+
+  /* === SEMANTIC BADGE COLORS (used in task chips) === */
+  --color-badge-mint-bg: #ecfdf5;
+  --color-badge-mint-text: #065f46;
+  --color-badge-neutral-bg: #f0ebf8;
+  --color-badge-neutral-text: #6e6780;
+
+  /* === RADIUS === */
+  --radius-sm: 9px;
+  --radius-md: 12px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Legacy aliases — referenced across .tsx files; map to tokens above */
+  --color-text: var(--color-text-primary);
+  --color-primary: var(--color-btn-bg);
+  --color-primary-dark: color-mix(in srgb, var(--color-btn-bg) 82%, #000000);
+}
+
+:root[data-theme='dark'] {
+  /* === BACKGROUNDS === */
+  --color-bg: #0f0a1a;
+  --color-surface: #1c1530;
+  --color-input-bg: #140e24;
+
+  /* === TEXT === */
+  --color-text-primary: #f0ebf8;
+  --color-text-secondary: #8b7fa8;
+
+  /* === BORDERS === */
+  --color-border: rgba(255, 255, 255, 0.08);
+
+  /* === PRIMARY ACTION — flips to lavender in dark mode === */
+  --color-btn-bg: #a78bfa;
+  --color-btn-text: #0f0a1a;
+
+  /* === GRADIENT stays identical — brand constant === */
+  --gradient-rainbow: linear-gradient(90deg, #f472b6, #fb923c, #fbbf24, #34d399, #38bdf8, #a78bfa);
+
+  /* === MODULE COLORS — dark variants === */
+  --color-module-tasks-bg: #2d1b2e;
+  --color-module-tasks-text: #f9a8d4;
+
+  --color-module-places-bg: #221a08;
+  --color-module-places-text: #fde68a;
+
+  --color-module-meals-bg: #0a1f2e;
+  --color-module-meals-text: #7dd3fc;
+
+  --color-module-family-bg: #1a1230;
+  --color-module-family-text: #c4b5fd;
+
+  /* === SEMANTIC BADGE COLORS — dark variants === */
+  --color-badge-mint-bg: #0a2018;
+  --color-badge-mint-text: #6ee7b7;
+  --color-badge-neutral-bg: #1c1530;
+  --color-badge-neutral-text: #8b7fa8;
+}
+
+/* Theme utilities — use with design tokens (light / dark via data-theme) */
+.bg-page {
+  background-color: var(--color-bg);
+}
+
+.bg-surface {
+  background-color: var(--color-surface);
+}
+
+.text-primary {
+  color: var(--color-text-primary);
+}
+
+.text-secondary {
+  color: var(--color-text-secondary);
+}
+
+/* Adds a 3px rainbow gradient bar at the top of any card */
+.card-rainbow {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-rainbow::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-rainbow);
+  border-radius: inherit;
 }
 
 /* Prevent pull-to-refresh on iOS PWA — interferes with scroll */

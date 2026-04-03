@@ -65,6 +65,17 @@ function DashboardIcon() {
   )
 }
 
+/** Sprout-style icon for the kids development tracker (Module 4B). */
+function DevelopmentIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-5 w-5 shrink-0">
+      <path d="M12 22V11" strokeLinecap="round" />
+      <path d="M12 11c-2.5-3.5-1-8 3.5-9.5C14 5 12.5 8 12 11Z" strokeLinejoin="round" />
+      <path d="M12 11c2.5-3.5 1-8-3.5-9.5C10 5 11.5 8 12 11Z" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 type BottomNavProps = {
   navHeight: number
 }
@@ -78,6 +89,7 @@ function BottomNav({ navHeight }: BottomNavProps) {
     { label: 'Poznámky', path: '/notes', icon: <NotesIcon /> },
     { label: 'Místa', path: '/places', icon: <PlacesIcon /> },
     { label: 'Jídelníček', path: '/meal-plan', icon: <MealPlanIcon /> },
+    { label: 'Vývoj dětí', path: '/milestones', icon: <DevelopmentIcon /> },
     { label: 'Dashboard', path: '/dashboard', icon: <DashboardIcon /> },
   ]
 
@@ -91,9 +103,12 @@ function BottomNav({ navHeight }: BottomNavProps) {
       }}
       aria-label="Spodní navigace"
     >
-      <div className="mx-auto grid h-[80px] max-w-md grid-cols-5 px-0.5">
+      <div className="mx-auto grid h-[80px] max-w-md grid-cols-6 px-0.5">
         {tabs.map((tab) => {
-          const isActive = location.pathname === tab.path
+          const isActive =
+            tab.path === '/milestones'
+              ? location.pathname.startsWith('/milestones')
+              : location.pathname === tab.path
           const isPrimary = Boolean(tab.isPrimary)
           const baseColor = isActive
             ? 'var(--color-primary)'
@@ -123,7 +138,7 @@ function BottomNav({ navHeight }: BottomNavProps) {
               ) : (
                 tab.icon
               )}
-              <span className="max-w-full truncate text-center text-[10px] font-medium leading-tight">
+              <span className="max-w-full text-center text-[9px] font-medium leading-tight">
                 {tab.label}
               </span>
             </button>

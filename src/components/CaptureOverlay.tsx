@@ -554,7 +554,7 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
       <section className="mx-auto w-full max-w-md pb-28">
         <h1 className="text-3xl font-bold">Potvrzení</h1>
 
-        <div className="mt-5 rounded-2xl bg-white p-4 shadow-sm">
+        <div className="card-rainbow mt-5 rounded-2xl bg-white p-4 shadow-sm">
           <p className="text-sm font-semibold">Přepis:</p>
           <p className="mt-2 text-base" style={{ color: 'var(--color-text)' }}>
             {result.transcript}

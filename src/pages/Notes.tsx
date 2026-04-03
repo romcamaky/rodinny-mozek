@@ -137,7 +137,7 @@ function Notes() {
         <NotesSkeleton />
       ) : notes.length === 0 ? (
         <div
-          className="mt-8 rounded-xl border border-dashed p-6 text-center"
+          className="card-rainbow mt-8 rounded-xl border border-dashed p-6 text-center"
           style={{
             borderColor: 'color-mix(in srgb, var(--color-text-secondary) 35%, transparent)',
           }}
@@ -163,7 +163,7 @@ function Notes() {
             return (
               <li
                 key={note.id}
-                className="rounded-lg border p-3 shadow-sm"
+                className="card-rainbow rounded-lg border p-3 shadow-sm"
                 style={{
                   backgroundColor: 'var(--color-surface)',
                   borderColor: '#e2e8f0',

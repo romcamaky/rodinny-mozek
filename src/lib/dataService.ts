@@ -3,11 +3,12 @@
 // Each function inserts into the correct Supabase table based on data type.
 
 import { supabase } from './supabase'
+import { CURRENT_USER_ID } from './constants'
 import type { MealPlan, Milestone, MilestoneLog, MilestoneTask, Note, Place, Task } from '../types/database'
 import type { NoteData, PlaceData, TaskData } from './voiceRouter'
 
-// Temporary hardcoded user ID — replaced with real auth in Phase 3
-export const TEMP_USER_ID = '00000000-0000-0000-0000-000000000001'
+/** Re-export for legacy imports; prefer `CURRENT_USER_ID` from `./constants`. */
+export const TEMP_USER_ID = CURRENT_USER_ID
 
 export type { Milestone, MilestoneLog, MilestoneTask }
 
@@ -29,7 +30,7 @@ export async function fetchTasks(filters?: {
   let query = supabase
     .from('tasks')
     .select('*')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
     .order('created_at', { ascending: false })
 
   if (assignedTo !== 'all') {
@@ -62,7 +63,7 @@ export async function fetchNotes(filters?: {
   let query = supabase
     .from('notes')
     .select('*')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
     .order('created_at', { ascending: false })
 
   if (category !== 'all') {
@@ -86,7 +87,7 @@ export async function updateTaskStatus(
     .from('tasks')
     .update({ status: newStatus })
     .eq('id', taskId)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
 
   if (error) {
     return { success: false, error: error.message }
@@ -101,7 +102,7 @@ export async function deleteTask(
     .from('tasks')
     .delete()
     .eq('id', taskId)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
 
   if (error) {
     return { success: false, error: error.message }
@@ -116,7 +117,7 @@ export async function deleteNote(
     .from('notes')
     .delete()
     .eq('id', noteId)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
 
   if (error) {
     return { success: false, error: error.message }
@@ -144,7 +145,7 @@ export async function fetchPlaces(filters?: {
   let query = supabase
     .from('places')
     .select('*')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
     .order('created_at', { ascending: false })
 
   const source = filters?.source ?? 'all'
@@ -173,7 +174,7 @@ export async function deletePlace(
     .from('places')
     .delete()
     .eq('id', placeId)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
 
   if (error) {
     return { success: false, error: error.message }
@@ -210,7 +211,7 @@ export async function saveTask(
       : null
 
   const row = {
-    user_id: TEMP_USER_ID,
+    user_id: CURRENT_USER_ID,
     title: data.title.trim(),
     description,
     assigned_to: data.assigned_to,
@@ -240,7 +241,7 @@ export async function saveNote(
   visibility: 'shared' | 'private',
 ) {
   const row = {
-    user_id: TEMP_USER_ID,
+    user_id: CURRENT_USER_ID,
     text: data.text.trim(),
     category: data.category,
     source,
@@ -278,7 +279,7 @@ export async function savePlace(data: SavePlaceInput) {
       : null
 
   const row = {
-    user_id: TEMP_USER_ID,
+    user_id: CURRENT_USER_ID,
     name: data.name.trim(),
     address,
     latitude: null as number | null,
@@ -323,7 +324,7 @@ export async function fetchMilestones(
   let query = supabase
     .from('milestones')
     .select('*')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
     .order('created_at', { ascending: false })
 
   if (status) {
@@ -348,7 +349,7 @@ export async function saveMilestone(milestone: {
     .from('milestones')
     .insert({
       ...milestone,
-      user_id: TEMP_USER_ID,
+      user_id: CURRENT_USER_ID,
       description:
         milestone.description !== undefined && milestone.description.trim() !== ''
           ? milestone.description.trim()
@@ -377,7 +378,7 @@ export async function updateMilestoneStatus(
     .from('milestones')
     .update(update)
     .eq('id', id)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
 
   if (error) {
     throw new Error(error.message)
@@ -389,7 +390,7 @@ export async function deleteMilestone(id: string): Promise<void> {
     .from('milestones')
     .delete()
     .eq('id', id)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
 
   if (error) {
     throw new Error(error.message)
@@ -403,7 +404,7 @@ export async function fetchMilestoneLogs(milestoneId: string): Promise<Milestone
     .from('milestone_logs')
     .select('*')
     .eq('milestone_id', milestoneId)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
     .order('logged_at', { ascending: false })
 
   if (error) {
@@ -423,7 +424,7 @@ export async function saveMilestoneLog(log: {
     .from('milestone_logs')
     .insert({
       ...log,
-      user_id: TEMP_USER_ID,
+      user_id: CURRENT_USER_ID,
       ai_response:
         log.ai_response !== undefined && log.ai_response.trim() !== ''
           ? log.ai_response.trim()
@@ -446,7 +447,7 @@ export async function fetchMilestoneTasks(milestoneId: string): Promise<Mileston
     .from('milestone_tasks')
     .select('*')
     .eq('milestone_id', milestoneId)
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
     .order('week_start', { ascending: false })
     .limit(1)
     .single()
@@ -467,7 +468,7 @@ export async function saveMilestoneTasks(task: {
     .from('milestone_tasks')
     .insert({
       ...task,
-      user_id: TEMP_USER_ID,
+      user_id: CURRENT_USER_ID,
     })
     .select()
     .single()
@@ -651,7 +652,7 @@ export async function saveMealPlan(
   const { data: existing, error: findError } = await supabase
     .from('meal_plans')
     .select('id')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
     .eq('week_start', weekStart)
     .eq('variant', variant)
     .maybeSingle()
@@ -661,7 +662,7 @@ export async function saveMealPlan(
   }
 
   const row = {
-    user_id: TEMP_USER_ID,
+    user_id: CURRENT_USER_ID,
     week_start: weekStart,
     variant,
     plan_data: planData,
@@ -690,7 +691,7 @@ export async function fetchMealPlan(weekStart: string): Promise<MealPlan[]> {
   const { data, error } = await supabase
     .from('meal_plans')
     .select('*')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
     .eq('week_start', weekStart)
     .order('variant', { ascending: true })
 
@@ -706,7 +707,7 @@ export async function fetchActiveMealPlan(): Promise<MealPlan | null> {
   const { data, error } = await supabase
     .from('meal_plans')
     .select('*')
-    .eq('user_id', TEMP_USER_ID)
+    .eq('user_id', CURRENT_USER_ID)
     .eq('status', 'active')
     .order('updated_at', { ascending: false })
     .limit(1)

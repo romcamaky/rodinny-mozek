@@ -291,60 +291,58 @@ function MealPlan() {
 
   if (initialLoading) {
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4">
+      <div className="bg-page flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4">
         <div
-          className="h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600"
+          className="h-10 w-10 animate-spin rounded-full border-2 border-[color:var(--color-border)] border-t-[color:var(--color-text-secondary)]"
           aria-hidden
         />
-        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-          Načítám jídelníček...
-        </p>
+        <p className="text-secondary text-sm">Načítám jídelníček...</p>
       </div>
     )
   }
 
   if (pageMode === 'generate') {
     return (
-      <div className="mx-auto max-w-md space-y-5">
+      <div className="bg-page mx-auto max-w-md space-y-5">
         <div>
-          <h1 className="text-xl font-semibold">Jídelníček</h1>
-          <p className="mt-1 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+          <h1 className="text-primary text-xl font-semibold">Jídelníček</h1>
+          <p className="text-secondary mt-1 text-sm">
             Týdenní plán pro celou rodinu — vaření v Thermomixu a nákup na Rohlík.
           </p>
         </div>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-medium">Týden od:</span>
+          <span className="text-primary mb-1 block text-sm font-medium">Týden od:</span>
           <input
             type="date"
             value={weekStart}
             disabled={generating}
             onChange={(e) => setWeekStart(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base"
+            className="bg-surface text-primary w-full rounded-lg border border-[color:var(--color-border)] px-3 py-2.5 text-base"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-medium">Mám v lednici: (volitelné)</span>
+          <span className="text-primary mb-1 block text-sm font-medium">Mám v lednici: (volitelné)</span>
           <textarea
             value={availText}
             disabled={generating}
             onChange={(e) => setAvailText(e.target.value)}
             rows={3}
             placeholder="např. kuřecí prsa, rýže basmati..."
-            className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="bg-surface text-primary placeholder:text-secondary w-full resize-y rounded-lg border border-[color:var(--color-border)] px-3 py-2 text-sm"
           />
         </label>
 
         <label className="block">
-          <span className="mb-1 block text-sm font-medium">Tento týden bez: (volitelné)</span>
+          <span className="text-primary mb-1 block text-sm font-medium">Tento týden bez: (volitelné)</span>
           <textarea
             value={excludeText}
             disabled={generating}
             onChange={(e) => setExcludeText(e.target.value)}
             rows={2}
             placeholder="např. houby, vepřové..."
-            className="w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            className="bg-surface text-primary placeholder:text-secondary w-full resize-y rounded-lg border border-[color:var(--color-border)] px-3 py-2 text-sm"
           />
         </label>
 
@@ -369,13 +367,9 @@ function MealPlan() {
         </button>
 
         {generating ? (
-          <p className="text-center text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            Claude připravuje váš jídelníček...
-          </p>
+          <p className="text-secondary text-center text-sm">Claude připravuje váš jídelníček...</p>
         ) : (
-          <p className="text-center text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-            Generování trvá ~30 sekund
-          </p>
+          <p className="text-secondary text-center text-xs">Generování trvá ~30 sekund</p>
         )}
       </div>
     )
@@ -386,10 +380,10 @@ function MealPlan() {
   }
 
   return (
-    <div className="mx-auto max-w-md pb-40">
+    <div className="bg-page mx-auto max-w-md pb-40">
       <div className="mb-4">
-        <h1 className="text-xl font-semibold">Jídelníček</h1>
-        <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+        <h1 className="text-primary text-xl font-semibold">Jídelníček</h1>
+        <p className="text-secondary text-sm">
           {formatWeekRange(weekStart)}
           {!savedToDb ? (
             <span className="ml-2 text-amber-700">· Neuloženo</span>
@@ -441,15 +435,15 @@ function MealPlan() {
             return (
               <section
                 key={day}
-                className="overflow-hidden rounded-lg bg-white shadow-sm"
+                className="card-rainbow bg-surface overflow-hidden rounded-lg shadow-sm"
                 style={{
                   boxShadow: '0 1px 3px color-mix(in srgb, var(--color-text) 12%, transparent)',
                 }}
               >
-                <h2 className="border-b border-slate-100 px-4 py-3 text-base font-bold">
+                <h2 className="text-secondary border-b border-[color:var(--color-border)] px-4 py-3 text-base font-bold">
                   {getCzechDayName(day)}
                 </h2>
-                <ul className="divide-y divide-slate-100">
+                <ul className="divide-y divide-[color:var(--color-border)]">
                   {entries.map(([mealType, meal]) => {
                     const label = MEAL_TYPE_LABELS[mealType] ?? mealType
                     const rowKey = `${day}:${mealType}`
@@ -457,22 +451,22 @@ function MealPlan() {
                     return (
                       <li
                         key={mealType}
-                        className={`flex gap-2 px-4 py-3 ${isReplacing ? 'animate-pulse bg-slate-50' : ''}`}
+                        className={`flex gap-2 px-4 py-3 ${isReplacing ? 'animate-pulse bg-[color:var(--color-input-bg)]' : ''}`}
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                          <div className="text-secondary text-xs font-medium uppercase tracking-wide">
                             {label}
                           </div>
-                          <div className="font-medium text-slate-900">{meal.name}</div>
+                          <div className="text-primary font-medium">{meal.name}</div>
                           {meal.note ? (
-                            <div className="mt-0.5 text-sm text-slate-600">{meal.note}</div>
+                            <div className="text-secondary mt-0.5 text-sm">{meal.note}</div>
                           ) : null}
                         </div>
                         <button
                           type="button"
                           disabled={isReplacing || !!replacingKey}
                           onClick={() => setRejectTarget({ day, mealType })}
-                          className="h-11 min-w-11 shrink-0 rounded-lg text-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                          className="text-secondary h-11 min-w-11 shrink-0 rounded-lg text-lg transition hover:bg-red-500/10 hover:text-red-500"
                           aria-label="Odmítnout jídlo"
                         >
                           ❌
@@ -493,26 +487,29 @@ function MealPlan() {
             return (
               <article
                 key={`${block.cook_day}-${i}`}
-                className="rounded-lg bg-white p-4 shadow-sm"
+                className="card-rainbow bg-surface rounded-lg p-4 shadow-sm"
                 style={{
                   boxShadow: '0 1px 3px color-mix(in srgb, var(--color-text) 12%, transparent)',
                 }}
               >
-                <h3 className="text-base font-bold">{formatBatchCookDayHeader(block.cook_day)}</h3>
-                <p className="mt-1 text-sm text-slate-600">
+                <h3 className="text-primary text-base font-bold">{formatBatchCookDayHeader(block.cook_day)}</h3>
+                <p className="text-secondary mt-1 text-sm">
                   → {block.meals_covered.map(formatCoverageLine).join(', ')}
                 </p>
                 <ul className="mt-3 space-y-3">
                   {block.recipes.map((r, j) => (
-                    <li key={j} className="border-t border-slate-100 pt-3 first:border-0 first:pt-0">
-                      <div className="font-medium">{r.name}</div>
+                    <li
+                      key={j}
+                      className="border-t border-[color:var(--color-border)] pt-3 first:border-0 first:pt-0"
+                    >
+                      <div className="text-primary font-medium">{r.name}</div>
                       {typeof r.tm_time_minutes === 'number' ? (
-                        <div className="text-sm text-slate-600">⏱ {r.tm_time_minutes} min v TM</div>
+                        <div className="text-secondary text-sm">⏱ {r.tm_time_minutes} min v TM</div>
                       ) : null}
                       {typeof r.portions === 'number' ? (
-                        <div className="text-sm text-slate-600">📦 {r.portions} porcí</div>
+                        <div className="text-secondary text-sm">📦 {r.portions} porcí</div>
                       ) : null}
-                      {r.note ? <div className="text-sm text-slate-500">{r.note}</div> : null}
+                      {r.note ? <div className="text-secondary text-sm">{r.note}</div> : null}
                     </li>
                   ))}
                 </ul>
@@ -520,7 +517,7 @@ function MealPlan() {
             )
           })}
           {plan.batch_cooking?.length === 0 ? (
-            <p className="text-sm text-slate-600">Žádné plánované vaření v dávkách.</p>
+            <p className="text-secondary text-sm">Žádné plánované vaření v dávkách.</p>
           ) : null}
         </div>
       )}
@@ -530,7 +527,7 @@ function MealPlan() {
           <button
             type="button"
             onClick={() => void copyShoppingList()}
-            className="w-full rounded-xl border-2 border-slate-200 bg-white py-3 text-sm font-medium text-slate-800"
+            className="bg-surface text-primary w-full rounded-xl border-2 border-[color:var(--color-border)] py-3 text-sm font-medium"
           >
             Kopírovat seznam
           </button>
@@ -545,14 +542,14 @@ function MealPlan() {
               return (
                 <div
                   key={category}
-                  className="overflow-hidden rounded-lg bg-white shadow-sm"
+                  className="card-rainbow bg-surface overflow-hidden rounded-lg shadow-sm"
                   style={{
                     boxShadow: '0 1px 3px color-mix(in srgb, var(--color-text) 12%, transparent)',
                   }}
                 >
                   <button
                     type="button"
-                    className="flex w-full min-h-11 items-center justify-between px-4 py-3 text-left font-bold"
+                    className="text-primary flex w-full min-h-11 items-center justify-between px-4 py-3 text-left font-bold"
                     onClick={() =>
                       setExpandedCategories((prev) => ({ ...prev, [category]: !open }))
                     }
@@ -560,17 +557,17 @@ function MealPlan() {
                     <span>
                       {emoji} {category}
                     </span>
-                    <span className="text-slate-400">{open ? '▼' : '▶'}</span>
+                    <span className="text-secondary">{open ? '▼' : '▶'}</span>
                   </button>
                   {open ? (
-                    <ul className="border-t border-slate-100 px-2 py-1">
+                    <ul className="border-t border-[color:var(--color-border)] px-2 py-1">
                       {items.map((item) => {
                         const id = shoppingItemKey(category, item)
                         const checked = Boolean(bought[id])
                         return (
                           <li
                             key={id}
-                            className="flex items-center gap-3 border-b border-slate-50 py-1 last:border-0"
+                            className="flex items-center gap-3 border-b border-[color:var(--color-border)] py-1 last:border-0"
                           >
                             <label className="flex min-h-[44px] flex-1 cursor-pointer items-center gap-3 py-2">
                               <input
@@ -579,11 +576,11 @@ function MealPlan() {
                                 onChange={() => {
                                   persistBought({ ...bought, [id]: !checked })
                                 }}
-                                className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300 accent-[var(--color-primary)]"
+                                className="border-[color:var(--color-border)] h-5 w-5 shrink-0 cursor-pointer rounded accent-[var(--color-primary)]"
                               />
-                              <span className="text-sm">
+                              <span className="text-primary text-sm">
                                 {item.name}{' '}
-                                <span className="text-slate-500">
+                                <span className="text-secondary">
                                   — {item.quantity} {item.unit}
                                 </span>
                               </span>
@@ -607,23 +604,23 @@ function MealPlan() {
           aria-modal="true"
           aria-labelledby="reject-meal-title"
         >
-          <div className="w-full max-w-md rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl">
-            <h2 id="reject-meal-title" className="text-lg font-semibold">
+          <div className="card-rainbow bg-surface w-full max-w-md rounded-t-2xl p-4 shadow-xl sm:rounded-2xl">
+            <h2 id="reject-meal-title" className="text-primary text-lg font-semibold">
               Nechci toto jídlo
             </h2>
-            <p className="mt-1 text-sm text-slate-600">Důvod (volitelně):</p>
+            <p className="text-secondary mt-1 text-sm">Důvod (volitelně):</p>
             <input
               type="text"
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2"
+              className="text-primary placeholder:text-secondary mt-2 w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-input-bg)] px-3 py-2"
               placeholder="např. nemáme rádi..."
               autoFocus
             />
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
-                className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium"
+                className="text-primary flex-1 rounded-xl border border-[color:var(--color-border)] py-3 text-sm font-medium"
                 onClick={() => {
                   setRejectTarget(null)
                   setRejectReason('')
@@ -646,7 +643,7 @@ function MealPlan() {
 
       {/* Bottom action bar */}
       <div
-        className="fixed inset-x-0 bottom-[calc(80px+env(safe-area-inset-bottom))] z-20 border-t bg-white/95 px-4 py-3 backdrop-blur-sm max-w-md mx-auto left-0 right-0"
+        className="bg-surface/95 fixed inset-x-0 bottom-[calc(80px+env(safe-area-inset-bottom))] z-20 mx-auto max-w-md border-t px-4 py-3 backdrop-blur-sm left-0 right-0"
         style={{
           borderColor: 'color-mix(in srgb, var(--color-text-secondary) 20%, transparent)',
         }}
@@ -664,7 +661,7 @@ function MealPlan() {
           <button
             type="button"
             onClick={startNewPlan}
-            className="flex-1 rounded-xl border-2 border-slate-200 py-3 text-sm font-medium"
+            className="text-primary flex-1 rounded-xl border-2 border-[color:var(--color-border)] py-3 text-sm font-medium"
           >
             Nový plán
           </button>

@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import CaptureFAB from './CaptureFAB'
+import ThemeToggle from './ThemeToggle'
 
 const TOP_BAR_HEIGHT = 56
 const BOTTOM_NAV_HEIGHT = 80
@@ -21,10 +22,11 @@ function Layout() {
           borderColor: 'color-mix(in srgb, var(--color-text-secondary) 20%, transparent)',
         }}
       >
-        <div className="flex h-full items-center">
+        <div className="flex h-full w-full items-center justify-between gap-2">
           <span className="text-sm font-medium no-select" style={{ color: 'var(--color-text-secondary)' }}>
             Mozek 🧠
           </span>
+          <ThemeToggle />
         </div>
       </header>
 

@@ -2,6 +2,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { initTheme } from './lib/theme'
+
+initTheme()
 
 // Unregister any existing service workers that may be caching stale responses.
 // We'll re-register a fixed service worker later.
