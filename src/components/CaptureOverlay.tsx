@@ -586,7 +586,7 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
         {result.classification.target !== 'place' ? (
           <div
             className="fixed inset-x-4 z-40"
-            style={{ bottom: 'calc(92px + env(safe-area-inset-bottom))' }}
+            style={{ bottom: 'calc(80px + env(safe-area-inset-bottom))' }}
           >
             <button
               type="button"
@@ -619,11 +619,23 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] bg-white overflow-y-auto" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-[60] overflow-y-auto bg-surface"
+      role="dialog"
+      aria-modal="true"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}
+    >
       <button
         type="button"
-        className="fixed right-4 top-4 z-[61] min-h-11 min-w-11 rounded-full border bg-white text-xl shadow-sm"
-        style={{ color: 'var(--color-text-secondary)', borderColor: '#e2e8f0' }}
+        className="fixed right-4 z-[61] min-h-11 min-w-11 rounded-full border bg-white text-xl shadow-sm"
+        style={{
+          color: 'var(--color-text-secondary)',
+          borderColor: '#e2e8f0',
+          top: 'calc(env(safe-area-inset-top) + 12px)',
+        }}
         aria-label="Zavřít"
         onClick={onClose}
       >

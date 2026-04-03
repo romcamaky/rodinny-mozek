@@ -604,25 +604,27 @@ function MealPlan() {
       {/* Reject meal modal */}
       {rejectTarget ? (
         <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 sm:items-center"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 p-4 pt-[env(safe-area-inset-top)] sm:items-center"
           role="dialog"
           aria-modal="true"
           aria-labelledby="reject-meal-title"
         >
-          <div className="card-rainbow bg-surface w-full max-w-md rounded-t-2xl p-4 shadow-xl sm:rounded-2xl">
+          <div className="card-rainbow bg-surface flex max-h-[70dvh] w-full max-w-md flex-col overflow-hidden rounded-t-2xl p-4 shadow-xl sm:rounded-2xl">
             <h2 id="reject-meal-title" className="text-primary text-lg font-semibold">
               Nechci toto jídlo
             </h2>
-            <p className="text-secondary mt-1 text-sm">Důvod (volitelně):</p>
-            <input
-              type="text"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              className="text-primary placeholder:text-secondary mt-2 w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-input-bg)] px-3 py-2"
-              placeholder="např. nemáme rádi..."
-              autoFocus
-            />
-            <div className="mt-4 flex gap-2">
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <p className="text-secondary mt-1 text-sm">Důvod (volitelně):</p>
+              <input
+                type="text"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                className="text-primary placeholder:text-secondary mt-2 w-full rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-input-bg)] px-3 py-2"
+                placeholder="např. nemáme rádi..."
+                autoFocus
+              />
+            </div>
+            <div className="flex flex-shrink-0 gap-2 pt-3 pb-[env(safe-area-inset-bottom)]">
               <button
                 type="button"
                 className="text-primary flex-1 rounded-xl border border-[color:var(--color-border)] py-3 text-sm font-medium"
