@@ -285,7 +285,14 @@ function WellbeingPage() {
       return
     }
     triggerStepTransition(() => {
-      setPlannedBlocks(defaultPlannedBlocks(mySelected, ourSelected))
+      setPlannedBlocks((prev) => {
+        const defaults = defaultPlannedBlocks(mySelected, ourSelected)
+        const prevByNeed = new Map(prev.map((p) => [p.needLabel, p]))
+        return defaults.map((d) => {
+          const old = prevByNeed.get(d.needLabel)
+          return old ? { ...d, day: old.day, timeSlot: old.timeSlot } : d
+        })
+      })
       setWizardStep(3)
     })
   }
@@ -368,6 +375,23 @@ function WellbeingPage() {
               ))}
             </ul>
           </div>
+
+          <button
+            type="button"
+            className="text-primary mt-6 flex min-h-12 w-full items-center justify-center rounded-xl border-2 border-[color:var(--color-border)] text-sm font-medium transition-opacity active:opacity-80"
+            onClick={() => {
+              setMySelected(thisWeekRow.myNeeds.map((n) => ({ ...n })))
+              setOurSelected(thisWeekRow.ourNeeds.map((n) => ({ ...n })))
+              setPlannedBlocks(thisWeekRow.plannedBlocks.map((b) => ({ ...b })))
+              setMyCustomInput('')
+              setOurCustomInput('')
+              setWizardStep(1)
+              setStepEnter(true)
+              setFlowView('wizard')
+            }}
+          >
+            Upravit plán
+          </button>
         </section>
       )}
 

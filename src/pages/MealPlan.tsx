@@ -445,6 +445,11 @@ function MealPlan() {
                 </h2>
                 <ul className="divide-y divide-[color:var(--color-border)]">
                   {entries.map(([mealType, meal]) => {
+                    const nameTrimmed =
+                      meal && typeof meal.name === 'string' ? meal.name.trim() : ''
+                    if (!nameTrimmed) {
+                      return null
+                    }
                     const label = MEAL_TYPE_LABELS[mealType] ?? mealType
                     const rowKey = `${day}:${mealType}`
                     const isReplacing = replacingKey === rowKey
