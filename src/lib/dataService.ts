@@ -1,5 +1,9 @@
 // Data service — handles all Supabase CRUD operations.
 // Rows are scoped to the signed-in user via getCurrentUserId().
+//
+// Supabase: this module uses ONLY the singleton from `./supabase` (no createClient here).
+// Calendar sync uses standalone `fetch()` to the Edge Function with manual apikey — it does not
+// create or replace the Supabase client and does not affect REST calls to /rest/v1.
 
 import { supabase } from './supabase'
 import { CURRENT_USER_ID } from './constants'

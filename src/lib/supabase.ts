@@ -27,6 +27,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   global: {
     headers: {
       'X-Client-Info': 'rodinny-mozek',
+      // Explicit apikey so PostgREST always receives it (avoids “No API key found in request”
+      // if any code path omits the default). Same value as the createClient second argument.
+      apikey: supabaseAnonKey,
     },
   },
 })
