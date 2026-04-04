@@ -9,6 +9,96 @@ import type { NoteData, PlaceData, TaskData } from './voiceRouter'
 /** Re-export for legacy imports; prefer `getCurrentUserId()` at runtime. */
 export const TEMP_USER_ID = CURRENT_USER_ID
 
+/** Shape sent to calendar-sync for create/update/delete (matches Edge Function contract). */
+export type CalendarSyncEventIdsPayload = {
+  week_before: string | null
+  two_days_before: string | null
+  deadline: string | null
+}
+
+function calendarSyncFunctionUrl(): string {
+  const base = import.meta.env.VITE_SUPABASE_URL as string
+  return `${base}/functions/v1/calendar-sync`
+}
+
+/**
+ * Calls the calendar-sync Edge Function to create/update/delete Google Calendar events.
+ * Returns new event_ids for create/update, or null for delete / failure.
+ * Never throws — failures are logged so task CRUD is never blocked by Calendar.
+ */
+async function syncTaskCalendar(
+  mode: 'create' | 'update' | 'delete',
+  payload: {
+    task_id: string
+    title?: string
+    deadline?: string
+    event_ids?: CalendarSyncEventIdsPayload
+  },
+): Promise<CalendarSyncEventIdsPayload | null> {
+  try {
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+    const body: Record<string, unknown> = { mode, ...payload }
+    const res = await fetch(calendarSyncFunctionUrl(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: anonKey,
+        Authorization: `Bearer ${anonKey}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const text = await res.text()
+    let json: { success?: boolean; event_ids?: CalendarSyncEventIdsPayload } = {}
+    try {
+      json = JSON.parse(text) as typeof json
+    } catch {
+      console.error('calendar-sync: invalid JSON response', text.slice(0, 500))
+      return null
+    }
+
+    if (!res.ok || json.success !== true) {
+      console.error('calendar-sync failed', { status: res.status, body: json })
+      return null
+    }
+
+    if (mode === 'delete') {
+      return null
+    }
+
+    const ids = json.event_ids
+    if (!ids || typeof ids !== 'object') {
+      console.error('calendar-sync: missing event_ids in response')
+      return null
+    }
+
+    return {
+      week_before: ids.week_before ?? null,
+      two_days_before: ids.two_days_before ?? null,
+      deadline: ids.deadline ?? null,
+    }
+  } catch (e) {
+    console.error('calendar-sync request error', e)
+    return null
+  }
+}
+
+/** Normalize stored JSONB so the Edge Function always receives three explicit keys. */
+function toCalendarPayload(
+  ids: NonNullable<Task['google_calendar_event_ids']>,
+): CalendarSyncEventIdsPayload {
+  return {
+    week_before: ids.week_before ?? null,
+    two_days_before: ids.two_days_before ?? null,
+    deadline: ids.deadline ?? null,
+  }
+}
+
+function hasAnyCalendarEventId(ids: Task['google_calendar_event_ids']): boolean {
+  if (!ids) return false
+  return Boolean(ids.week_before || ids.two_days_before || ids.deadline)
+}
+
 /** Authenticated user id; `CURRENT_USER_ID` only if session is missing unexpectedly. */
 export async function getCurrentUserId(): Promise<string> {
   const {
@@ -102,6 +192,40 @@ export async function updateTaskStatus(
   if (error) {
     return { success: false, error: error.message }
   }
+
+  // When marking done, remove linked Google Calendar events and clear sync columns (best-effort).
+  if (newStatus === 'done') {
+    try {
+      const { data: row } = await supabase
+        .from('tasks')
+        .select('google_calendar_event_ids')
+        .eq('id', taskId)
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      const gIds = row?.google_calendar_event_ids as Task['google_calendar_event_ids'] | undefined
+      if (hasAnyCalendarEventId(gIds ?? null) && gIds) {
+        await syncTaskCalendar('delete', {
+          task_id: taskId,
+          event_ids: toCalendarPayload(gIds),
+        })
+        const { error: clearErr } = await supabase
+          .from('tasks')
+          .update({
+            google_calendar_event_ids: null,
+            google_calendar_synced_at: null,
+          })
+          .eq('id', taskId)
+          .eq('user_id', userId)
+        if (clearErr) {
+          console.error('Failed to clear google calendar fields after done', clearErr)
+        }
+      }
+    } catch (e) {
+      console.error('updateTaskStatus calendar cleanup error', e)
+    }
+  }
+
   return { success: true }
 }
 
@@ -109,6 +233,27 @@ export async function deleteTask(
   taskId: string,
 ): Promise<{ success: boolean; error?: string }> {
   const userId = await getCurrentUserId()
+
+  // Remove Calendar events first so orphaned events are not left behind (best-effort).
+  try {
+    const { data: row } = await supabase
+      .from('tasks')
+      .select('google_calendar_event_ids')
+      .eq('id', taskId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    const gIds = row?.google_calendar_event_ids as Task['google_calendar_event_ids'] | undefined
+    if (hasAnyCalendarEventId(gIds ?? null)) {
+      await syncTaskCalendar('delete', {
+        task_id: taskId,
+        event_ids: toCalendarPayload(gIds!),
+      })
+    }
+  } catch (e) {
+    console.error('deleteTask calendar sync error', e)
+  }
+
   const { error } = await supabase
     .from('tasks')
     .delete()
@@ -118,6 +263,114 @@ export async function deleteTask(
   if (error) {
     return { success: false, error: error.message }
   }
+  return { success: true }
+}
+
+/**
+ * Updates a task's deadline and keeps Google Calendar in sync (create/update/delete remote events).
+ * The DB deadline is saved first; Calendar runs afterward and never rolls back the deadline change.
+ */
+export async function updateTaskDeadline(
+  taskId: string,
+  newDeadline: string | null,
+  currentEventIds: Task['google_calendar_event_ids'],
+): Promise<{ success: boolean; error?: string }> {
+  const userId = await getCurrentUserId()
+
+  const { data: row, error: fetchError } = await supabase
+    .from('tasks')
+    .select('title')
+    .eq('id', taskId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (fetchError || !row) {
+    return { success: false, error: fetchError?.message ?? 'Task not found' }
+  }
+
+  const title = (row as { title: string }).title
+
+  const normalizedDeadline =
+    newDeadline && newDeadline.trim() !== '' ? newDeadline.trim() : null
+
+  const { error: updErr } = await supabase
+    .from('tasks')
+    .update({ deadline: normalizedDeadline })
+    .eq('id', taskId)
+    .eq('user_id', userId)
+
+  if (updErr) {
+    return { success: false, error: updErr.message }
+  }
+
+  const hadIds = hasAnyCalendarEventId(currentEventIds)
+
+  try {
+    if (!normalizedDeadline) {
+      if (hadIds && currentEventIds) {
+        await syncTaskCalendar('delete', {
+          task_id: taskId,
+          event_ids: toCalendarPayload(currentEventIds),
+        })
+      }
+      const { error: clearErr } = await supabase
+        .from('tasks')
+        .update({
+          google_calendar_event_ids: null,
+          google_calendar_synced_at: null,
+        })
+        .eq('id', taskId)
+        .eq('user_id', userId)
+      if (clearErr) {
+        console.error('updateTaskDeadline: failed to clear calendar columns', clearErr)
+      }
+      return { success: true }
+    }
+
+    if (hadIds && currentEventIds) {
+      const eventIds = await syncTaskCalendar('update', {
+        task_id: taskId,
+        title,
+        deadline: normalizedDeadline,
+        event_ids: toCalendarPayload(currentEventIds),
+      })
+      if (eventIds) {
+        const { error: calErr } = await supabase
+          .from('tasks')
+          .update({
+            google_calendar_event_ids: eventIds,
+            google_calendar_synced_at: new Date().toISOString(),
+          })
+          .eq('id', taskId)
+          .eq('user_id', userId)
+        if (calErr) {
+          console.error('updateTaskDeadline: failed to save event ids', calErr)
+        }
+      }
+    } else {
+      const eventIds = await syncTaskCalendar('create', {
+        task_id: taskId,
+        title,
+        deadline: normalizedDeadline,
+      })
+      if (eventIds) {
+        const { error: calErr } = await supabase
+          .from('tasks')
+          .update({
+            google_calendar_event_ids: eventIds,
+            google_calendar_synced_at: new Date().toISOString(),
+          })
+          .eq('id', taskId)
+          .eq('user_id', userId)
+        if (calErr) {
+          console.error('updateTaskDeadline: failed to save event ids (create)', calErr)
+        }
+      }
+    }
+  } catch (e) {
+    console.error('updateTaskDeadline calendar error', e)
+  }
+
   return { success: true }
 }
 
@@ -209,6 +462,24 @@ export type VoiceClassification = {
   data: TaskData | NoteData | PlaceData | MilestoneData
 }
 
+/**
+ * Columns allowed on INSERT into `tasks` only.
+ * Never add `google_calendar_event_ids` or `google_calendar_synced_at` here — PostgREST
+ * returns PGRST204 if unknown columns are sent, and those fields are set in a separate
+ * UPDATE after the calendar-sync Edge Function runs.
+ */
+type TaskInsertPayload = Pick<
+  Task,
+  | 'user_id'
+  | 'title'
+  | 'description'
+  | 'assigned_to'
+  | 'deadline'
+  | 'status'
+  | 'source'
+  | 'visibility'
+>
+
 // Maps TaskData + capture metadata to the `tasks` row shape (matches src/types/database.ts).
 export async function saveTask(
   data: TaskData,
@@ -225,25 +496,54 @@ export async function saveTask(
       ? data.deadline.trim()
       : null
 
-  const row = {
+  const taskInsertPayload: TaskInsertPayload = {
     user_id: userId,
     title: data.title.trim(),
     description,
     assigned_to: data.assigned_to,
     deadline,
-    status: 'todo' as const,
+    status: 'todo',
     source,
     visibility,
   }
 
   const { data: inserted, error } = await supabase
     .from('tasks')
-    .insert(row)
+    .insert(taskInsertPayload)
     .select()
     .single()
 
   if (error) {
     throw new Error(error.message)
+  }
+
+  const task = inserted as Task
+
+  // Best-effort Google Calendar: create reminder events when a deadline exists (does not block save).
+  if (task.deadline && task.deadline.trim() !== '') {
+    try {
+      const eventIds = await syncTaskCalendar('create', {
+        task_id: task.id,
+        title: task.title,
+        deadline: task.deadline.trim(),
+      })
+      if (eventIds) {
+        const syncedAt = new Date().toISOString()
+        const { error: calErr } = await supabase
+          .from('tasks')
+          .update({
+            google_calendar_event_ids: eventIds,
+            google_calendar_synced_at: syncedAt,
+          })
+          .eq('id', task.id)
+          .eq('user_id', userId)
+        if (calErr) {
+          console.error('Failed to persist google_calendar_event_ids after create', calErr)
+        }
+      }
+    } catch (e) {
+      console.error('saveTask calendar sync error', e)
+    }
   }
 
   return inserted

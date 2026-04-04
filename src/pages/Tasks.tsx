@@ -233,11 +233,16 @@ function Tasks() {
                   </button>
                   <div className="min-w-0 flex-1">
                     <p
-                      className={`text-base font-semibold leading-snug ${
+                      className={`flex flex-wrap items-center gap-1 text-base font-semibold leading-snug ${
                         isDone ? 'line-through' : ''
                       }`}
                     >
-                      {task.title}
+                      {task.google_calendar_event_ids ? (
+                        <span className="shrink-0 select-none" aria-hidden>
+                          📅
+                        </span>
+                      ) : null}
+                      <span className="min-w-0">{task.title}</span>
                     </p>
                     {task.description ? (
                       <p

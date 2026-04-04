@@ -8,6 +8,14 @@ export interface Task {
   status: 'todo' | 'in_progress' | 'done'
   source: 'voice' | 'text' | 'ai_generated'
   visibility: 'shared' | 'private'
+  /** Google Calendar event IDs from calendar-sync Edge Function; null if never synced. */
+  google_calendar_event_ids: {
+    week_before: string | null
+    two_days_before: string | null
+    deadline: string | null
+  } | null
+  /** When google_calendar_event_ids was last written after a successful sync. */
+  google_calendar_synced_at: string | null
   created_at: string
   updated_at: string
 }
