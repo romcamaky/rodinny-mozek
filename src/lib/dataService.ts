@@ -568,6 +568,10 @@ export async function saveNote(
     visibility,
   }
 
+  // DEBUG: Check auth state — remove after testing
+  const { data: { session } } = await supabase.auth.getSession()
+  console.log('DEBUG auth session:', session?.user?.id, 'inserting user_id:', row.user_id)
+
   const { data: inserted, error } = await supabase
     .from('notes')
     .insert(row)
