@@ -17,7 +17,8 @@ type Visibility = 'shared' | 'private'
 type Target = 'task' | 'note' | 'place' | 'milestone'
 
 type TaskFormState = TaskData & { visibility: Visibility }
-type NoteFormState = NoteData & { visibility: Visibility }
+// Notes: no per-row visibility (column removed from DB); form state matches NoteData only.
+type NoteFormState = NoteData
 
 const NOTE_CATEGORY_OPTIONS: { label: string; value: NoteData['category'] }[] = [
   { label: 'Nápad', value: 'idea' },
@@ -150,7 +151,6 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
         setNoteForm({
           text: data.text ?? '',
           category: data.category ?? 'other',
-          visibility: 'shared',
         })
         setTaskForm(null)
         setPlaceForm(null)
@@ -243,11 +243,10 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
 
     if (target === 'note') {
       if (!noteForm) return null
-      const { visibility: _v, ...noteData } = noteForm
       return {
         target: 'note',
         confidence: result.classification.confidence,
-        data: noteData,
+        data: noteForm,
       }
     }
 
@@ -296,12 +295,9 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
       return
     }
 
+    // Task capture still supports shared/private; notes ignore this argument in saveClassifiedData.
     const visibility: 'shared' | 'private' =
-      result.classification.target === 'task' && taskForm
-        ? taskForm.visibility
-        : result.classification.target === 'note' && noteForm
-          ? noteForm.visibility
-          : 'shared'
+      result.classification.target === 'task' && taskForm ? taskForm.visibility : 'shared'
 
     setIsSaving(true)
     try {
@@ -329,23 +325,15 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
     }
   }
 
-  function toggleVisibility(target: Target) {
-    if (target === 'task' && taskForm) {
-      setTaskForm({
-        ...taskForm,
-        visibility: taskForm.visibility === 'shared' ? 'private' : 'shared',
-      })
-    }
-
-    if (target === 'note' && noteForm) {
-      setNoteForm({
-        ...noteForm,
-        visibility: noteForm.visibility === 'shared' ? 'private' : 'shared',
-      })
-    }
+  function toggleTaskVisibility() {
+    if (!taskForm) return
+    setTaskForm({
+      ...taskForm,
+      visibility: taskForm.visibility === 'shared' ? 'private' : 'shared',
+    })
   }
 
-  function renderVisibilityToggle(target: 'task' | 'note', visibility: Visibility) {
+  function renderTaskVisibilityToggle(visibility: Visibility) {
     const isShared = visibility === 'shared'
 
     return (
@@ -356,7 +344,7 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
           borderColor: 'color-mix(in srgb, var(--color-text-secondary) 35%, transparent)',
           color: 'var(--color-text)',
         }}
-        onClick={() => toggleVisibility(target)}
+        onClick={() => toggleTaskVisibility()}
       >
         <span className={isShared ? 'font-semibold' : ''}>Sdílené</span>
         <span className="mx-2" style={{ color: 'var(--color-text-secondary)' }}>
@@ -425,7 +413,7 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
           onChange={(event) => setTaskForm({ ...taskForm, deadline: event.target.value })}
         />
 
-        {renderVisibilityToggle('task', taskForm.visibility)}
+        {renderTaskVisibilityToggle(taskForm.visibility)}
       </div>
     )
   }
@@ -459,8 +447,6 @@ function CaptureOverlay({ onClose }: CaptureOverlayProps) {
             </option>
           ))}
         </select>
-
-        {renderVisibilityToggle('note', noteForm.visibility)}
       </div>
     )
   }

@@ -553,24 +553,15 @@ export async function saveTask(
   return inserted
 }
 
-// Maps NoteData + capture metadata to the `notes` row shape.
-export async function saveNote(
-  data: NoteData,
-  source: 'voice' | 'text',
-  visibility: 'shared' | 'private',
-) {
+// Maps NoteData + capture metadata to the `notes` row shape (no visibility column — dropped from schema).
+export async function saveNote(data: NoteData, source: 'voice' | 'text') {
   const userId = await getCurrentUserId()
   const row = {
     user_id: userId,
     text: data.text.trim(),
     category: data.category,
     source,
-    visibility,
   }
-
-  // DEBUG: Check auth state — remove after testing
-  const { data: { session } } = await supabase.auth.getSession()
-  console.log('DEBUG auth session:', session?.user?.id, 'inserting user_id:', row.user_id)
 
   const { data: inserted, error } = await supabase
     .from('notes')
@@ -815,7 +806,7 @@ export async function saveMilestoneTasks(task: {
 
 /**
  * Routes the classified payload to the correct saver.
- * `visibility` applies to tasks and notes only; places have no visibility column in the schema.
+ * `visibility` is only used for tasks; notes no longer have a visibility column.
  */
 export async function saveClassifiedData(
   classification: VoiceClassification,
@@ -828,7 +819,7 @@ export async function saveClassifiedData(
         await saveTask(classification.data as TaskData, source, visibility)
         return { success: true, target: classification.target }
       case 'note':
-        await saveNote(classification.data as NoteData, source, visibility)
+        await saveNote(classification.data as NoteData, source)
         return { success: true, target: classification.target }
       case 'place':
         await savePlace(classification.data as SavePlaceInput)
