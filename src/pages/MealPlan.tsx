@@ -291,13 +291,30 @@ function MealPlan() {
     setRohlikLoading(true)
     setRohlikResult(null)
     try {
-      const result = await addToRohlikCart(plan.shopping_list)
+      const filteredList: GeneratedMealPlanPayload['shopping_list'] = {}
+      for (const [category, items] of Object.entries(plan.shopping_list)) {
+        const unchecked = items.filter((item) => {
+          const id = shoppingItemKey(category, item)
+          return !bought[id]
+        })
+        if (unchecked.length > 0) {
+          filteredList[category] = unchecked
+        }
+      }
+
+      const totalItems = Object.values(plan.shopping_list).flat().length
+      const filteredItems = Object.values(filteredList).flat().length
+      const skipped = totalItems - filteredItems
+
+      const result = await addToRohlikCart(filteredList)
       setRohlikResult(result)
+
+      const skipMsg = skipped > 0 ? ` (${skipped} přeskočeno jako doma)` : ''
       if (result.summary.failed === 0) {
-        showToast(`Přidáno ${result.summary.added} položek do Rohlíku ✓`, 'success')
+        showToast(`Přidáno ${result.summary.added} položek do Rohlíku ✓${skipMsg}`, 'success')
       } else {
         showToast(
-          `Přidáno ${result.summary.added} z ${result.summary.total} položek. ${result.summary.failed} se nepodařilo.`,
+          `Přidáno ${result.summary.added} z ${result.summary.total} položek. ${result.summary.failed} se nepodařilo.${skipMsg}`,
           'error',
         )
       }
