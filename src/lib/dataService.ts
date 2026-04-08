@@ -1126,6 +1126,7 @@ export async function addToRohlikCart(
     method: 'POST',
     headers: {
       Authorization: `Bearer ${key}`,
+      apikey: key,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ shopping_list: shoppingList }),
