@@ -883,6 +883,69 @@ export type BatchCookingBlock = {
   }[]
 }
 
+// Result shape returned by the rohlik-cart edge function
+export type RohlikCartItemResult = {
+  ingredient: string
+  searchQuery: string
+  productFound: boolean
+  productName: string | null
+  productId: number | null
+  added: boolean
+  error: string | null
+}
+
+export type RohlikCartResult = {
+  success: boolean
+  summary: {
+    total: number
+    added: number
+    failed: number
+  }
+  items: RohlikCartItemResult[]
+}
+
+/** Raw line object from rohlik-cart Edge Function (before mapping to RohlikCartItemResult). */
+type RohlikCartEdgeLine = {
+  original_name: string
+  search_query: string
+  status: 'added' | 'search_empty' | 'add_failed' | 'skipped_quantity'
+  product_id?: number
+  product_name?: string
+  error?: string
+}
+
+/** Maps Edge JSON (`results` + `summary`) to the PWA-facing RohlikCartResult shape. */
+function mapRohlikCartEdgeResponse(json: unknown): RohlikCartResult {
+  const r = json as {
+    success?: boolean
+    results?: RohlikCartEdgeLine[]
+    summary?: { added?: number; failed?: number }
+  }
+  const results = r.results ?? []
+  const added = r.summary?.added ?? 0
+  const failed = r.summary?.failed ?? 0
+  const total = results.length
+
+  const items: RohlikCartItemResult[] = results.map((row) => {
+    const productFound = row.status === 'added' || row.status === 'add_failed'
+    return {
+      ingredient: row.original_name,
+      searchQuery: row.search_query,
+      productFound,
+      productName: row.product_name ?? null,
+      productId: row.product_id ?? null,
+      added: row.status === 'added',
+      error: row.error ?? null,
+    }
+  })
+
+  return {
+    success: r.success !== false,
+    summary: { total, added, failed },
+    items,
+  }
+}
+
 function mealPlanFunctionUrl(): string {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
   return `${supabaseUrl}/functions/v1/generate-meal-plan`
@@ -1045,4 +1108,32 @@ export async function fetchActiveMealPlan(): Promise<MealPlan | null> {
   }
 
   return (data as MealPlan | null) ?? null
+}
+
+// Builds the URL for the rohlik-cart edge function
+function rohlikCartFunctionUrl(): string {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string
+  return `${supabaseUrl}/functions/v1/rohlik-cart`
+}
+
+// Sends the shopping list to the rohlik-cart edge function
+// Returns a summary of what was added and what failed
+export async function addToRohlikCart(
+  shoppingList: GeneratedMealPlanPayload['shopping_list'],
+): Promise<RohlikCartResult> {
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string
+  const response = await fetch(rohlikCartFunctionUrl(), {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ shopping_list: shoppingList }),
+  })
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { error?: string }
+    throw new Error(body.error ?? `Rohlik cart error: ${response.status}`)
+  }
+  const raw = await response.json()
+  return mapRohlikCartEdgeResponse(raw)
 }

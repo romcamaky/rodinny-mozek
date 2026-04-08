@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  addToRohlikCart,
   fetchActiveMealPlan,
   generateMealPlan,
   replaceMeal,
@@ -11,6 +12,7 @@ import {
   type BatchCookingBlock,
   type GeneratedMealPlanPayload,
   type RejectedMealInput,
+  type RohlikCartResult,
 } from '../lib/dataService'
 import { MEAL_TYPE_LABELS, SHOPPING_CATEGORY_EMOJI } from '../lib/mealPlanConstants'
 import {
@@ -129,6 +131,11 @@ function MealPlan() {
 
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({})
   const [bought, setBought] = useState<Record<string, boolean>>({})
+
+  // Tracks whether the Rohlik cart request is in progress
+  const [rohlikLoading, setRohlikLoading] = useState(false)
+  // Stores the result of the last Rohlik cart attempt (null = not yet tried)
+  const [rohlikResult, setRohlikResult] = useState<RohlikCartResult | null>(null)
 
   useEffect(() => {
     if (pageMode === 'plan' && plan) {
@@ -275,6 +282,30 @@ function MealPlan() {
       showToast('Seznam zkopírován.', 'success')
     } catch {
       showToast('Kopírování se nezdařilo.', 'error')
+    }
+  }
+
+  // Sends the current shopping list to Rohlik and populates the cart
+  const addToRohlik = async () => {
+    if (!plan?.shopping_list) return
+    setRohlikLoading(true)
+    setRohlikResult(null)
+    try {
+      const result = await addToRohlikCart(plan.shopping_list)
+      setRohlikResult(result)
+      if (result.summary.failed === 0) {
+        showToast(`Přidáno ${result.summary.added} položek do Rohlíku ✓`, 'success')
+      } else {
+        showToast(
+          `Přidáno ${result.summary.added} z ${result.summary.total} položek. ${result.summary.failed} se nepodařilo.`,
+          'error',
+        )
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Neznámá chyba'
+      showToast(`Chyba Rohlíku: ${msg}`, 'error')
+    } finally {
+      setRohlikLoading(false)
     }
   }
 
@@ -536,6 +567,31 @@ function MealPlan() {
           >
             Kopírovat seznam
           </button>
+          {/* Rohlik cart button — sends shopping list to Rohlik.cz */}
+          <button
+            type="button"
+            onClick={() => void addToRohlik()}
+            disabled={rohlikLoading}
+            className="bg-surface text-primary w-full rounded-xl border-2 border-[color:var(--color-border)] py-3 text-sm font-medium disabled:opacity-50"
+          >
+            {rohlikLoading ? 'Přidávám do Rohlíku…' : '🛒 Přidat do Rohlíku'}
+          </button>
+          {/* Result summary shown after Rohlik cart attempt */}
+          {rohlikResult && (
+            <div className="card-rainbow bg-surface rounded-lg p-4 text-sm">
+              <p className="text-primary mb-2 font-bold">
+                Výsledek: {rohlikResult.summary.added}/{rohlikResult.summary.total} položek přidáno
+              </p>
+              {rohlikResult.items
+                .filter((item) => !item.added)
+                .map((item) => (
+                  <p key={item.ingredient} className="text-secondary mt-1 text-xs">
+                    ✗ {item.ingredient}
+                    {item.productFound ? ' — nepodařilo se přidat' : ' — produkt nenalezen'}
+                  </p>
+                ))}
+            </div>
+          )}
           {Object.entries(plan.shopping_list ?? {})
             .sort(([a], [b]) => a.localeCompare(b, 'cs'))
             .map(([category, items]) => {
