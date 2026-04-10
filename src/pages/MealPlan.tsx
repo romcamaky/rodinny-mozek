@@ -293,12 +293,13 @@ function MealPlan() {
     try {
       const filteredList: GeneratedMealPlanPayload['shopping_list'] = {}
       for (const [category, items] of Object.entries(plan.shopping_list)) {
-        const unchecked = items.filter((item) => {
+        const included = items.filter((item) => {
           const id = shoppingItemKey(category, item)
+          // Include when the row is checked for Rohlík (not marked skip in `bought`)
           return !bought[id]
         })
-        if (unchecked.length > 0) {
-          filteredList[category] = unchecked
+        if (included.length > 0) {
+          filteredList[category] = included
         }
       }
 
@@ -609,6 +610,31 @@ function MealPlan() {
                 ))}
             </div>
           )}
+          {/* Select all / deselect all for Rohlik cart */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => persistBought({})}
+              className="flex-1 rounded-lg border border-[color:var(--color-border)] bg-surface py-2 text-xs font-medium text-primary"
+            >
+              ✓ Označit vše
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const allBought: Record<string, boolean> = {}
+                for (const [category, items] of Object.entries(plan?.shopping_list ?? {})) {
+                  for (const item of items) {
+                    allBought[shoppingItemKey(category, item)] = true
+                  }
+                }
+                persistBought(allBought)
+              }}
+              className="flex-1 rounded-lg border border-[color:var(--color-border)] bg-surface py-2 text-xs font-medium text-primary"
+            >
+              ✗ Zrušit vše
+            </button>
+          </div>
           {Object.entries(plan.shopping_list ?? {})
             .sort(([a], [b]) => a.localeCompare(b, 'cs'))
             .map(([category, items]) => {
@@ -641,7 +667,7 @@ function MealPlan() {
                     <ul className="border-t border-[color:var(--color-border)] px-2 py-1">
                       {items.map((item) => {
                         const id = shoppingItemKey(category, item)
-                        const checked = Boolean(bought[id])
+                        const checked = !bought[id]
                         return (
                           <li
                             key={id}
@@ -652,7 +678,10 @@ function MealPlan() {
                                 type="checkbox"
                                 checked={checked}
                                 onChange={() => {
-                                  persistBought({ ...bought, [id]: !checked })
+                                  persistBought({
+                                    ...bought,
+                                    [id]: !Boolean(bought[id]),
+                                  })
                                 }}
                                 className="border-[color:var(--color-border)] h-5 w-5 shrink-0 cursor-pointer rounded accent-[var(--color-primary)]"
                               />
